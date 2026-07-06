@@ -1,0 +1,186 @@
+# =============================================================================
+# release.yml  —  SKELETON release pipeline for the Home LLM Hub (Type A, FREE).
+# -----------------------------------------------------------------------------
+# This is a STARTING POINT, not a turnkey workflow. It builds the hub into a
+# self-contained app and then per-OS one-click artifacts:
+#
+#   Linux   -> .AppImage + .deb           (BUILT + TESTED on a Linux runner)
+#   macOS   -> .app -> .dmg (codesign + notarize)   (NEEDS an Apple Developer
+#                                                    cert + an Apple ID; the
+#                                                    steps are UNTESTED here)
+#   Windows -> .exe (Inno Setup) signed with signtool (NEEDS a code-signing
+#                                                    cert; UNTESTED here)
+#
+# >>> BEFORE THIS RUNS GREEN YOU MUST ADD SECRETS / CERTS <<<
+#   Required repo or org SECRETS (Settings -> Secrets and variables -> Actions):
+#     APPLE_CERT_P12_BASE64     base64 of your "Developer ID Application" .p12
+#     APPLE_CERT_PASSWORD       password for that .p12
+#     APPLE_TEAM_ID             10-char Apple Developer Team ID
+#     APPLE_NOTARY_APPLE_ID     Apple ID email used for notarytool
+#     APPLE_NOTARY_PASSWORD     app-specific password (or store a notary profile)
+#     WIN_CERT_PFX_BASE64       base64 of your Windows code-signing .pfx
+#     WIN_CERT_PASSWORD         password for that .pfx
+#
+# Without those, the macOS/Windows jobs still PRODUCE artifacts, but they will be
+# UNSIGNED — users get Gatekeeper / SmartScreen warnings. Mark the workflow as
+# allowed to fail on mac/win until the certs are in place (see continue-on-error
+# notes below). The Linux job needs no secrets and should be your gate.
+#
+# Place this file at .github/workflows/release.yml in the repo that contains the
+# hub source. See installer/RELEASE.md for the full design + prerequisites.
+# =============================================================================
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"            # e.g. v1.0.0  -> cuts a release with all three artifacts
+  workflow_dispatch: {} # manual runs for testing the pipeline
+
+# A tagged release: create the GitHub Release once, then upload per-OS assets.
+permissions:
+  contents: write       # needed to create the Release + upload assets
+
+env:
+  APP_NAME: "HomeLLMHub"
+  # Python the hub is known-good on (matches the dev box: 3.10).
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 0. Create the GitHub Release shell that every OS job uploads into.
+  # ---------------------------------------------------------------------------
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.gh.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or reuse the Release
+        id: gh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME:-manual-$(date +%Y%m%d%H%M%S)}"
+          # gh release create is idempotent enough for a skeleton; on re-run we
+          # just reuse the existing release.
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --notes "Automated build of $TAG"
+          echo "upload_url=$(gh release view "$TAG" --json uploadUrl -q .uploadUrl)" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # 1. The matrix build. Each OS produces one or more one-click artifacts.
+  #    macOS/Windows are allowed to fail until signing secrets exist.
+  # ---------------------------------------------------------------------------
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04   # build on the OLDEST supported glibc for portability
+            target: linux
+          - os: macos-14       # arm64 runner; add macos-13 for x86_64 if needed
+            target: macos
+          - os: windows-2022
+            target: windows
+    runs-on: ${{ matrix.os }}
+    # mac/win are best-effort until certs land; Linux must pass.
+    continue-on-error: ${{ matrix.target != 'linux' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # --- Shared: build a one-file binary of the FastAPI app with PyInstaller.
+      # The per-OS packager scripts (installer/packagers/*) wrap this binary.
+      - name: Build self-contained app (PyInstaller)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r home-hub/requirements.txt pyinstaller
+          # installer/build_app.py emits dist/${APP_NAME}{,.exe}. See RELEASE.md.
+          python installer/build_app.py --name "${APP_NAME}"
+
+      # ----- LINUX: .AppImage + .deb  (no secrets needed; this is the gate) ----
+      - name: Package Linux (.AppImage + .deb)
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y fuse libfuse2 desktop-file-utils
+          bash installer/packagers/linux/make_appimage.sh "dist/${APP_NAME}"
+          bash installer/packagers/linux/make_deb.sh      "dist/${APP_NAME}"
+
+      # ----- macOS: .app -> .dmg -> codesign + notarize (REQUIRES Apple cert) --
+      - name: Import Apple signing cert
+        if: matrix.target == 'macos' && env.HAVE_APPLE_CERT == 'true'
+        env:
+          HAVE_APPLE_CERT: ${{ secrets.APPLE_CERT_P12_BASE64 != '' }}
+        run: echo "cert import step — see RELEASE.md (security create-keychain ...)"
+
+      - name: Package macOS (.dmg, codesign + notarize)
+        if: matrix.target == 'macos'
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # brew install create-dmg
+          # installer/packagers/macos/make_dmg.sh does: build .app, create-dmg,
+          # codesign --deep --options runtime, xcrun notarytool submit --wait,
+          # xcrun stapler staple. UNSIGNED if APPLE_* secrets are empty.
+          bash installer/packagers/macos/make_dmg.sh "dist/${APP_NAME}" || {
+            echo "::warning::macOS package failed (likely missing Apple cert/secrets)"; exit 1; }
+
+      # ----- WINDOWS: Inno Setup .exe -> signtool sign (REQUIRES code cert) -----
+      - name: Package Windows (.exe via Inno Setup, signed)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        env:
+          WIN_CERT_PFX_BASE64: ${{ secrets.WIN_CERT_PFX_BASE64 }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: |
+          # choco install innosetup -y
+          # installer/packagers/windows/make_installer.ps1 runs ISCC.exe on the
+          # .iss script, then signtool sign /fd SHA256 /tr <timestamp> the .exe.
+          # UNSIGNED (SmartScreen warning) if WIN_CERT_* secrets are empty.
+          ./installer/packagers/windows/make_installer.ps1 -Binary "dist/$env:APP_NAME.exe"
+
+      # --- Collect whatever this OS produced for upload.
+      - name: Stage artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          # Each packager writes into installer/out/; copy them up.
+          cp -v installer/out/* out/ 2>/dev/null || true
+          ls -la out
+
+      - name: Upload to the Release
+        if: always() && hashFiles('out/*') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME:-manual}"
+          for f in out/*; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+
+      # Always keep build artifacts even when not a tagged release.
+      - name: Upload build artifacts (CI)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-artifacts
+          path: out/*
+          if-no-files-found: warn

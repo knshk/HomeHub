@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en" data-palette="cubby">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home Hub</title>
+<meta name="theme-color" content="#3B5BD9">
+<script>
+/* Set theme before paint to avoid flash */
+(function () {
+  try {
+    var p = localStorage.getItem('hh_palette') || 'cubby';
+    var m = localStorage.getItem('hh_mode') || 'light';
+    var resolved = m === 'system'
+      ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : m;
+    document.documentElement.setAttribute('data-palette', p);
+    document.documentElement.setAttribute('data-mode', resolved);
+  } catch (e) {
+    document.documentElement.setAttribute('data-mode', 'light');
+  }
+})();
+</script>
+<style>
+/* ============================================================
+   HOME HUB — design system
+   Tokens · 3 palettes (Cubby / Greenhouse / Hearth) × light + dark
+   ============================================================ */
+:root {
+  /* spacing scale */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+  /* type scale */
+  --fs-xs: 0.78rem; --fs-sm: 0.875rem; --fs-md: 1rem;
+  --fs-lg: 1.125rem; --fs-xl: 1.375rem;
+  --fs-2xl: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem);
+  --fs-3xl: clamp(2rem, 1.4rem + 2.6vw, 2.9rem);
+  /* radius (per-palette overrides below) */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-card: 18px; --r-pill: 999px;
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(20,24,40,.06), 0 1px 3px rgba(20,24,40,.05);
+  --shadow-md: 0 4px 14px rgba(20,24,40,.08), 0 2px 6px rgba(20,24,40,.05);
+  --shadow-lg: 0 18px 50px rgba(20,24,40,.22);
+  --ring: 0 0 0 4px var(--accent-soft);
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-head: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --maxw: 1120px;
+}
+
+/* ---------- CUBBY (default) ---------- */
+[data-palette="cubby"] {
+  --font-head: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-card: 20px;
+}
+[data-palette="cubby"][data-mode="light"] {
+  --bg: #EEF0F4; --bg-grad: #E7EAF2;
+  --surface: #FFFFFF; --surface-2: #F5F7FB; --surface-3: #EDEFF6;
+  --text: #1E2333; --muted: #5B6378; --faint: #8A93A8;
+  --border: #DCE0EB; --border-strong: #C7CDDC;
+  --accent: #3B5BD9; --accent-ink: #FFFFFF; --accent-soft: #E3E9FC; --accent-2: #5B78E8;
+  --pop: #F2B632; --pop-soft: #FCEFCB;
+  --danger: #D6453B; --danger-soft: #FBE2E0;
+  --success: #2E9E6B; --success-soft: #DBF1E6;
+}
+[data-palette="cubby"][data-mode="dark"] {
+  --bg: #141824; --bg-grad: #11151F;
+  --surface: #1E2431; --surface-2: #262E3E; --surface-3: #2E3850;
+  --text: #EAEDF6; --muted: #9BA4BA; --faint: #717C95;
+  --border: #303A4E; --border-strong: #3C4862;
+  --accent: #7B92F2; --accent-ink: #0E1320; --accent-soft: #283460; --accent-2: #94A6F6;
+  --pop: #F2B632; --pop-soft: #3D341B;
+  --danger: #F0786E; --danger-soft: #3A2220;
+  --success: #4FC089; --success-soft: #163127;
+}
+
+/* ---------- GREENHOUSE ---------- */
+[data-palette="greenhouse"] {
+  --font-head: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 14px; --r-card: 16px;
+}
+[data-palette="greenhouse"][data-mode="light"] {
+  --bg: #EAEFE7; --bg-grad: #E1E8DC;
+  --surface: #FFFFFF; --surface-2: #F4F7F1; --surface-3: #E9EFE5;
+  --text: #1E332A; --muted: #56695C; --faint: #84957F;
+  --border: #D5DECF; --border-strong: #C2CEB9;
+  --accent: #356B57; --accent-ink: #FFFFFF; --accent-soft: #DCE8DF; --accent-2: #44826B;
+  --pop: #E0A56B; --pop-soft: #F6E7D4;
+  --danger: #C0533F; --danger-soft: #F4E0D9;
+  --success: #3E8E5E; --success-soft: #DCEEE1;
+}
+[data-palette="greenhouse"][data-mode="dark"] {
+  --bg: #14201A; --bg-grad: #101A15;
+  --surface: #1C2A23; --surface-2: #233129; --surface-3: #2B3B31;
+  --text: #E7EFE7; --muted: #93A799; --faint: #6E8273;
+  --border: #2C3D33; --border-strong: #3A4F42;
+  --accent: #62A786; --accent-ink: #0C1611; --accent-soft: #21382D; --accent-2: #7CBC9C;
+  --pop: #E0A56B; --pop-soft: #382C1F;
+  --danger: #E08571; --danger-soft: #36231D;
+  --success: #5BB07E; --success-soft: #15291E;
+}
+
+/* ---------- HEARTH ---------- */
+[data-palette="hearth"] {
+  --font-head: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --r-sm: 7px; --r-md: 10px; --r-lg: 13px; --r-card: 14px;
+}
+[data-palette="hearth"][data-mode="light"] {
+  --bg: #F4EDE1; --bg-grad: #EFE5D5;
+  --surface: #FFFBF4; --surface-2: #F7F0E4; --surface-3: #F0E6D6;
+  --text: #2B2118; --muted: #6E6052; --faint: #9A8B79;
+  --border: #E4D8C6; --border-strong: #D6C7B0;
+  --accent: #C2673B; --accent-ink: #FFFFFF; --accent-soft: #F1DFD1; --accent-2: #D27C50;
+  --pop: #5C7A6B; --pop-soft: #DDE7E0;
+  --danger: #B24A3A; --danger-soft: #F2DCD6;
+  --success: #4E7A52; --success-soft: #DEE9DD;
+}
+[data-palette="hearth"][data-mode="dark"] {
+  --bg: #211C16; --bg-grad: #1A150F;
+  --surface: #2B251D; --surface-2: #342D24; --surface-3: #3E3528;
+  --text: #F1E9DC; --muted: #B3A593; --faint: #897C6A;
+  --border: #3D352A; --border-strong: #4C4234;
+  --accent: #DB8458; --accent-ink: #1A140E; --accent-soft: #3A2D22; --accent-2: #E89D72;
+  --pop: #88A38F; --pop-soft: #2A352E;
+  --danger: #E08571; --danger-soft: #382420;
+  --success: #7FAA82; --success-soft: #25301F;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font-body);
+  background:
+    radial-gradient(120% 80% at 100% 0%, var(--bg-grad), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+h1, h2, h3, h4 { font-family: var(--font-head); line-height: 1.15; font-weight: 700; }
+h1 { font-size: var(--fs-3xl); }
+h2 { font-size: var(--fs-2xl); }
+h3 { font-size: var(--fs-xl); }
+img { max-width: 100%; display: block; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+::selection { background: var(--accent-soft); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ============================================================
+   Components
+   ============================================================ */
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: 44px; padding: 0 18px; border: 1.5px solid transparent;
+  border-radius: var(--r-md); background: var(--surface-2); color: var(--text);
+  font-weight: 600; font-size: var(--fs-md); cursor: pointer;
+  transition: transform .12s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease;
+  -webkit-tap-highlight-color: transparent; text-decoration: none; white-space: nowrap;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn--primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
+.btn--primary:hover { box-shadow: var(--shadow-md); }
+.btn--soft { background: var(--accent-soft); color: var(--accent); }
+.btn--ghost { background: transparent; border-color: var(--border-strong); color: var(--text); }
+.btn--ghost:hover { background: var(--surface-2); }
+.btn--danger { background: var(--danger-soft); color: var(--danger); }
+.btn--lg { min-height: 52px; padding: 0 26px; font-size: var(--fs-lg); border-radius: var(--r-lg); }
+.btn--block { width: 100%; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; transform: none; }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; flex: 0 0 auto; padding: 0;
+  border: 1.5px solid transparent; border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+  transition: background .15s ease, transform .12s ease, color .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover { background: var(--surface-3); transform: translateY(-1px); }
+.icon-btn svg { width: 22px; height: 22px; }
+
+/* Inputs */
+.field {
+  display: flex; align-items: center; width: 100%; min-height: 48px;
+  padding: 0 14px; border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-md); background: var(--surface); color: var(--text);
+  font-size: var(--fs-md); transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field::placeholder { color: var(--faint); }
+.field:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+textarea.field { padding: 12px 14px; resize: vertical; line-height: 1.45; }
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: ""; position: absolute; right: 16px; top: 50%; width: 9px; height: 9px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: translateY(-65%) rotate(45deg); pointer-events: none;
+}
+select.field { appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer; }
+.label { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); margin-bottom: var(--sp-2); }
+
+/* Card */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-card); box-shadow: var(--shadow-sm);
+}
+.card--pad { padding: var(--sp-5); }
+
+/* Chips / badges */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px;
+  border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700;
+  background: var(--surface-3); color: var(--muted);
+}
+.chip--accent { background: var(--accent-soft); color: var(--accent); }
+.chip--pop { background: var(--pop-soft); color: var(--text); }
+.chip--ok { background: var(--success-soft); color: var(--success); }
+.chip--warn { background: var(--danger-soft); color: var(--danger); }
+
+/* Avatar */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 38px; height: 38px; border-radius: 14px; font-weight: 800;
+  font-size: var(--fs-sm); color: #fff; letter-spacing: .02em;
+}
+
+/* Toggle switch */
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .track {
+  width: 50px; height: 30px; border-radius: 999px; background: var(--border-strong);
+  position: relative; transition: background .18s ease; flex: 0 0 auto;
+}
+.switch .track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px;
+  border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform .18s ease;
+}
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(20px); }
+.switch input:focus-visible + .track { box-shadow: var(--ring); }
+
+/* Checkbox */
+.check { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; min-height: 44px; }
+.check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.check .box {
+  width: 26px; height: 26px; flex: 0 0 auto; border-radius: 8px;
+  border: 2px solid var(--border-strong); background: var(--surface);
+  display: inline-flex; align-items: center; justify-content: center; transition: all .15s ease;
+}
+.check .box svg { width: 16px; height: 16px; opacity: 0; transform: scale(.6); transition: all .15s ease; color: var(--accent-ink); }
+.check input:checked + .box { background: var(--accent); border-color: var(--accent); }
+.check input:checked + .box svg { opacity: 1; transform: scale(1); }
+.check input:focus-visible + .box { box-shadow: var(--ring); }
+
+/* Tabs (cubby slots) */
+.tabs { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  border-radius: var(--r-md); border: 1.5px solid transparent; background: transparent;
+  color: var(--muted); font-weight: 650; font-weight: 600; cursor: pointer; font-size: var(--fs-sm);
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab svg { width: 19px; height: 19px; }
+.tab:hover { color: var(--text); background: var(--surface-2); }
+.tab[aria-selected="true"] {
+  background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm);
+  border-color: var(--border);
+}
+
+/* Modal */
+.overlay {
+  position: fixed; inset: 0; background: rgba(15,18,30,.5); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center; padding: var(--sp-4);
+  z-index: 60; display: none;
+}
+.overlay.open { display: flex; }
+.modal {
+  width: 100%; max-width: 540px; max-height: 90dvh; overflow: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-card); box-shadow: var(--shadow-lg);
+  animation: modalIn .22s ease both;
+}
+@keyframes modalIn { from { transform: translateY(12px) scale(.985); } to { transform: none; } }
+.modal__head { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-5) var(--sp-5) var(--sp-3); }
+.modal__body { padding: 0 var(--sp-5) var(--sp-3); }
+.modal__foot { display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: flex-end; padding: var(--sp-4) var(--sp-5) var(--sp-5); }
+
+/* Toast */
+.toasts {
+  position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: var(--sp-2); z-index: 80; width: min(92vw, 420px);
+}
+.toast {
+  display: flex; align-items: center; gap: var(--sp-3); padding: 12px 16px;
+  background: var(--text); color: var(--bg); border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg); font-size: var(--fs-sm); font-weight: 600;
+  animation: toastIn .25s ease;
+}
+.toast .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--success); flex: 0 0 auto; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }
+
+/* ============================================================
+   App shell
+   ============================================================ */
+.app { display: none; }
+.app.show { display: block; }
+.appbar {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.appbar__inner {
+  max-width: var(--maxw); margin: 0 auto; padding: 10px var(--sp-4);
+  display: flex; align-items: center; gap: var(--sp-3);
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-head); font-weight: 800; font-size: var(--fs-lg); color: var(--text); }
+.brand .mark {
+  width: 38px; height: 38px; flex: 0 0 auto; border-radius: 12px;
+  background: var(--accent); color: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+.brand .mark svg { width: 22px; height: 22px; }
+.brand small { display: block; font-family: var(--font-body); font-weight: 500; font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.appbar__spacer { flex: 1; }
+.navwrap { background: transparent; border-bottom: 1px solid var(--border); }
+.navwrap__inner { max-width: var(--maxw); margin: 0 auto; padding: 8px var(--sp-4); }
+
+.main { max-width: var(--maxw); margin: 0 auto; padding: var(--sp-5) var(--sp-4) var(--sp-8); }
+.view { display: none; }
+.view.active { display: block; animation: viewIn .28s ease both; }
+@keyframes viewIn { from { transform: translateY(8px); } to { transform: translateY(0); } }
+.view__head { margin-bottom: var(--sp-5); }
+.view__head p { color: var(--muted); margin-top: 6px; }
+.eyebrow { font-size: var(--fs-xs); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+
+/* ============================================================
+   Gate (login)
+   ============================================================ */
+.gate {
+  min-height: 100dvh; display: grid; place-items: center; padding: var(--sp-5);
+}
+.gate__card {
+  width: 100%; max-width: 440px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-card);
+  box-shadow: var(--shadow-lg); padding: var(--sp-6) var(--sp-5);
+}
+.gate__logo {
+  width: 64px; height: 64px; border-radius: 20px; margin: 0 auto var(--sp-4);
+  background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; box-shadow: var(--shadow-md);
+}
+.gate__logo svg { width: 34px; height: 34px; }
+.gate h1 { font-size: var(--fs-2xl); text-align: center; }
+.gate__sub { text-align: center; color: var(--muted); margin: 8px 0 var(--sp-5); }
+.avatar-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: center; margin-bottom: var(--sp-4); }
+.avatar-pick {
+  width: 48px; height: 48px; border-radius: 16px; border: 2px solid transparent;
+  cursor: pointer; color: #fff; font-weight: 800; display: grid; place-items: center;
+  transition: transform .12s ease, box-shadow .15s ease;
+}
+.avatar-pick:hover { transform: translateY(-2px); }
+.avatar-pick[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); }
+.gate__admin { text-align: center; margin-top: var(--sp-4); }
+.linkish { background: none; border: none; color: var(--muted); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 8px; }
+.linkish:hover { color: var(--accent); }
+.admin-note {
+  margin-top: var(--sp-3); padding: var(--sp-3); border-radius: var(--r-md);
+  background: var(--pop-soft); font-size: var(--fs-sm); display: none;
+}
+.admin-note.show { display: block; }
+
+/* ============================================================
+   Chat
+   ============================================================ */
+.chat { display: flex; flex-direction: column; min-height: 60dvh; }
+.chat__log { display: flex; flex-direction: column; gap: var(--sp-4); padding-bottom: var(--sp-4); }
+.msg { display: flex; gap: var(--sp-3); align-items: flex-end; max-width: 100%; }
+.msg--me { flex-direction: row-reverse; }
+.bubble {
+  position: relative; max-width: min(78%, 640px); padding: 12px 16px;
+  border-radius: var(--r-lg); font-size: var(--fs-md); line-height: 1.5;
+  word-wrap: break-word; overflow-wrap: anywhere;
+}
+.msg--ai .bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 6px; }
+.msg--me .bubble { background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 6px; }
+.bubble__tools { display: flex; gap: 4px; margin-top: 8px; }
+.bubble__tools button {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+  border: none; border-radius: 8px; background: var(--surface-2); color: var(--muted);
+  font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
+}
+.bubble__tools button:hover { background: var(--surface-3); color: var(--text); }
+.bubble__tools svg { width: 15px; height: 15px; }
+.typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+.typing span { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); animation: blink 1.2s infinite; }
+.typing span:nth-child(2){ animation-delay: .2s; } .typing span:nth-child(3){ animation-delay: .4s; }
+@keyframes blink { 0%,60%,100%{ opacity:.3; transform: translateY(0);} 30%{ opacity:1; transform: translateY(-3px);} }
+
+.composer {
+  position: sticky; bottom: 0; margin-top: var(--sp-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card);
+  box-shadow: var(--shadow-md); padding: var(--sp-3);
+}
+.composer__row { display: flex; align-items: flex-end; gap: var(--sp-2); }
+.composer textarea {
+  flex: 1; border: none; background: transparent; resize: none; max-height: 140px;
+  padding: 10px 6px; font-size: var(--fs-md); line-height: 1.4;
+}
+.composer textarea:focus { outline: none; box-shadow: none; }
+.composer__bar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding: 0 4px 4px; }
+.composer__bar .spacer { flex: 1; }
+.mic-btn { background: var(--accent-soft); color: var(--accent); }
+.mic-btn.live { background: var(--danger); color: #fff; animation: pulse 1.4s infinite; }
+@keyframes pulse { 0%{ box-shadow: 0 0 0 0 var(--danger-soft);} 70%{ box-shadow: 0 0 0 12px transparent;} 100%{ box-shadow: 0 0 0 0 transparent;} }
+.send-btn { background: var(--accent); color: var(--accent-ink); }
+.speak-toggle { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
+
+/* ============================================================
+   Notes
+   ============================================================ */
+.masonry { columns: 1; column-gap: var(--sp-4); }
+@media (min-width: 560px){ .masonry { columns: 2; } }
+@media (min-width: 880px){ .masonry { columns: 3; } }
+.note {
+  break-inside: avoid; margin-bottom: var(--sp-4); padding: var(--sp-4);
+  border-radius: var(--r-card); border: 1px solid rgba(0,0,0,.06);
+  background: var(--note-c, var(--surface)); color: #2b2418;
+  box-shadow: var(--shadow-sm); position: relative;
+}
+/* Notes use bright pastel cards in BOTH themes — like sticky notes popping on a
+   dark board — so text stays dark for contrast regardless of theme. */
+[data-mode="dark"] .note { border-color: rgba(0,0,0,.14); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.note h4 { font-size: var(--fs-md); margin-bottom: 6px; padding-right: 32px; }
+.note p { font-size: var(--fs-sm); opacity: .85; }
+.note__pin {
+  position: absolute; top: 10px; right: 10px; width: 34px; height: 34px;
+  border: none; border-radius: 10px; background: rgba(0,0,0,.06); cursor: pointer;
+  display: grid; place-items: center; color: inherit;
+}
+.note__pin svg { width: 18px; height: 18px; }
+.note__pin.pinned { background: rgba(0,0,0,.16); }
+.note__meta { margin-top: 12px; font-size: var(--fs-xs); opacity: .6; display: flex; align-items: center; gap: 8px; }
+
+/* ============================================================
+   Checklists
+   ============================================================ */
+.lists { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@media (min-width: 720px){ .lists { grid-template-columns: 1fr 1fr; } }
+.list__head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.list__head h3 { flex: 1; }
+.list__item {
+  display: flex; align-items: center; gap: var(--sp-3); padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.list__item:last-child { border-bottom: none; }
+.list__item .txt { flex: 1; font-size: var(--fs-md); }
+.list__item input:checked ~ .txt { text-decoration: line-through; color: var(--faint); }
+.list__progress { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin-bottom: var(--sp-3); }
+.list__progress i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s ease; }
+
+/* ============================================================
+   Files & Photos
+   ============================================================ */
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; margin-bottom: var(--sp-4); }
+.search { position: relative; flex: 1; min-width: 220px; }
+.search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--faint); pointer-events: none; }
+.search .field { padding-left: 44px; }
+.dropzone {
+  border: 2px dashed var(--border-strong); border-radius: var(--r-card);
+  padding: var(--sp-6) var(--sp-4); text-align: center; color: var(--muted);
+  background: var(--surface-2); transition: all .18s ease; margin-bottom: var(--sp-5); cursor: pointer;
+}
+.dropzone.drag { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: scale(1.005); }
+.dropzone svg { width: 34px; height: 34px; color: var(--accent); margin-bottom: 8px; }
+.dropzone strong { color: var(--text); }
+
+.grid-tiles {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.tile {
+  border-radius: var(--r-md); overflow: hidden; background: var(--surface);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: pointer;
+  transition: transform .12s ease, box-shadow .15s ease;
+}
+.tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.tile__thumb { aspect-ratio: 4/3; display: grid; place-items: center; color: #fff; position: relative; }
+.tile__thumb svg { width: 34px; height: 34px; opacity: .92; }
+.tile__thumb .ext { position: absolute; bottom: 8px; left: 8px; font-size: 11px; font-weight: 800; background: rgba(0,0,0,.28); color: #fff; padding: 2px 7px; border-radius: 6px; letter-spacing: .04em; }
+.tile__meta { padding: 10px 12px; }
+.tile__meta .nm { font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile__meta .sz { font-size: var(--fs-xs); color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: var(--sp-7) var(--sp-4); }
+
+/* ============================================================
+   Keys
+   ============================================================ */
+.keyrow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border);
+}
+.keyrow:last-child { border-bottom: none; }
+.keyrow .kn { font-weight: 700; }
+.keyrow code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: var(--fs-sm);
+  background: var(--surface-2); padding: 6px 10px; border-radius: 8px; color: var(--muted);
+  word-break: break-all; flex: 1; min-width: 160px;
+}
+.keyrow .spacer { flex: 1; }
+
+/* ============================================================
+   Admin
+   ============================================================ */
+.dev-grid { display: grid; gap: var(--sp-3); grid-template-columns: 1fr; }
+@media (min-width: 760px){ .dev-grid { grid-template-columns: 1fr 1fr; } }
+.dev {
+  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4);
+  border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface);
+}
+.dev__ico { width: 44px; height: 44px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; flex: 0 0 auto; color: var(--muted); }
+.dev__ico svg { width: 22px; height: 22px; }
+.dev__main { flex: 1; min-width: 0; }
+.dev__main .nm { font-weight: 700; }
+.dev__main .sub { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev__actions { display: flex; gap: 8px; }
+
+.priv-grid { display: grid; gap: var(--sp-2); grid-template-columns: 1fr; margin-top: var(--sp-2); }
+@media (min-width: 460px){ .priv-grid { grid-template-columns: 1fr 1fr; } }
+.priv {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: var(--r-md); cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.priv:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.priv .check { min-height: auto; }
+.priv .priv__txt { font-size: var(--fs-sm); font-weight: 600; }
+
+/* Settings panel reuses modal */
+.opt-grid { display: grid; gap: var(--sp-2); grid-template-columns: 1fr; }
+@media (min-width: 420px){ .opt-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.opt {
+  border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 12px;
+  cursor: pointer; text-align: left; background: var(--surface); transition: all .15s ease;
+}
+.opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: var(--ring); }
+.opt .sw { display: flex; gap: 5px; margin-bottom: 8px; }
+.opt .sw i { width: 18px; height: 18px; border-radius: 6px; display: block; }
+.opt .nm { font-weight: 700; font-size: var(--fs-sm); }
+.opt .ds { font-size: var(--fs-xs); color: var(--muted); }
+.seg { display: inline-flex; padding: 4px; gap: 4px; background: var(--surface-2); border-radius: var(--r-md); }
+.seg button {
+  border: none; background: transparent; padding: 8px 14px; border-radius: 9px;
+  font-weight: 650; font-weight: 600; cursor: pointer; color: var(--muted); min-height: 40px;
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+
+/* Utility */
+.row { display: flex; align-items: center; gap: var(--sp-3); }
+.wrap { flex-wrap: wrap; }
+.between { justify-content: space-between; }
+.stack { display: flex; flex-direction: column; gap: var(--sp-3); }
+.mt-4 { margin-top: var(--sp-4); } .mt-5 { margin-top: var(--sp-5); }
+.muted { color: var(--muted); }
+.divider { height: 1px; background: var(--border); margin: var(--sp-4) 0; }
+.hide { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- ============================ GATE ============================ -->
+<section class="gate" id="gate">
+  <div class="gate__card">
+    <div class="gate__logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg>
+    </div>
+    <h1>Hi, who&rsquo;s home?</h1>
+    <p class="gate__sub">Pick a name and tap Enter. No passwords here &mdash; this hub only lives on your home WiFi.</p>
+
+    <div class="avatar-row" id="avatarRow" role="group" aria-label="Pick an avatar color"></div>
+
+    <label class="label" for="nameInput">Your name</label>
+    <input class="field" id="nameInput" type="text" placeholder="e.g. Maya" autocomplete="off" autocapitalize="words" maxlength="24">
+
+    <button class="btn btn--primary btn--lg btn--block mt-4" id="enterBtn">
+      Enter the Hub
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+    </button>
+
+    <div class="gate__admin">
+      <button class="linkish" id="adminToggle" aria-expanded="false">I&rsquo;m the admin</button>
+      <div class="admin-note" id="adminNote">
+        Admins set up the household and approve new devices. Enter with your name &mdash; if you&rsquo;re the
+        first one here, you&rsquo;ll be made admin automatically. Otherwise, an existing admin approves you.
+        <label class="check mt-4" style="font-size:var(--fs-sm)">
+          <input type="checkbox" id="claimAdmin">
+          <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>
+          <span>Set me up as the household admin</span>
+        </label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ APP ============================ -->
+<div class="app" id="app">
+  <header class="appbar">
+    <div class="appbar__inner">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+        <span>Home Hub<small>on your WiFi</small></span>
+      </div>
+      <div class="appbar__spacer"></div>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle light or dark" title="Light / dark">
+        <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings &amp; themes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <button class="avatar" id="meAvatar" aria-label="Your account" style="background:#3B5BD9">M</button>
+    </div>
+  </header>
+
+  <nav class="navwrap" aria-label="Sections">
+    <div class="navwrap__inner">
+      <div class="tabs" id="tabs" role="tablist">
+        <button class="tab" role="tab" data-view="chat" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat
+        </button>
+        <button class="tab" role="tab" data-view="notes" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12l-5 5H4z"/><path d="M15 21v-5h5"/></svg>
+          Notes
+        </button>
+        <button class="tab" role="tab" data-view="lists" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 7 2 2 3-3"/><path d="m4 17 2 2 3-3"/><path d="M13 6h7M13 18h7M13 12h7"/></svg>
+          Checklists
+        </button>
+        <button class="tab" role="tab" data-view="files" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+          Files &amp; Photos
+        </button>
+        <button class="tab" role="tab" data-view="keys" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 6l2 2M14 8l2 2"/></svg>
+          Keys
+        </button>
+        <button class="tab hide" role="tab" data-view="admin" aria-selected="false" id="adminTab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 7.6 8 9 4.6-1.4 8-4.5 8-9V6z"/></svg>
+          Admin
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ===== CHAT ===== -->
+    <section class="view active" id="view-chat" role="tabpanel" aria-label="Chat">
+      <div class="view__head">
+        <span class="eyebrow">Family assistant</span>
+        <h2 id="chatGreet">Ask me anything</h2>
+        <p>Runs right here on your home network. Nothing leaves the house.</p>
+      </div>
+
+      <div class="chat">
+        <div class="chat__log" id="chatLog" aria-live="polite"></div>
+
+        <form class="composer" id="composer">
+          <div class="composer__row">
+            <textarea id="chatInput" rows="1" placeholder="Type a message&hellip; or tap the mic" aria-label="Message"></textarea>
+          </div>
+          <div class="composer__bar">
+            <button type="button" class="icon-btn mic-btn" id="micBtn" aria-label="Speak your message" aria-pressed="false" title="Voice input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            </button>
+            <label class="switch speak-toggle" title="Read replies aloud">
+              <input type="checkbox" id="speakToggle">
+              <span class="track"></span>
+              <span>Speak replies</span>
+            </label>
+            <span class="spacer"></span>
+            <button type="submit" class="icon-btn send-btn" aria-label="Send message">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== NOTES ===== -->
+    <section class="view" id="view-notes" role="tabpanel" aria-label="Notes">
+      <div class="row between wrap view__head" style="margin-bottom:var(--sp-5)">
+        <div>
+          <span class="eyebrow">Shared noticeboard</span>
+          <h2>Notes</h2>
+        </div>
+        <button class="btn btn--primary" id="addNote">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          New note
+        </button>
+      </div>
+      <div class="masonry" id="noteBoard"></div>
+    </section>
+
+    <!-- ===== CHECKLISTS ===== -->
+    <section class="view" id="view-lists" role="tabpanel" aria-label="Checklists">
+      <div class="row between wrap view__head" style="margin-bottom:var(--sp-5)">
+        <div>
+          <span class="eyebrow">Get it done together</span>
+          <h2>Checklists</h2>
+        </div>
+        <button class="btn btn--primary" id="addList">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          New list
+        </button>
+      </div>
+      <div class="lists" id="listsWrap"></div>
+    </section>
+
+    <!-- ===== FILES & PHOTOS ===== -->
+    <section class="view" id="view-files" role="tabpanel" aria-label="Files and Photos">
+      <div class="view__head">
+        <span class="eyebrow">Household library</span>
+        <h2>Files &amp; Photos</h2>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input class="field" id="fileSearch" type="search" placeholder="Search files and photos&hellip;" aria-label="Search files and photos">
+        </div>
+        <button class="btn btn--soft" id="uploadBtn">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+          Upload
+        </button>
+      </div>
+
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Drag files here or tap to upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+        <div><strong>Drag photos &amp; files here</strong> &mdash; or tap to choose</div>
+        <div style="font-size:var(--fs-sm);margin-top:4px">Stays on your home server. Up to the whole family can see it.</div>
+      </div>
+
+      <p class="muted" id="fileCount" style="margin-bottom:var(--sp-3);font-weight:600"></p>
+      <div class="grid-tiles" id="fileGrid"></div>
+      <div class="empty hide" id="fileEmpty">
+        <p>No matches for that search.</p>
+      </div>
+    </section>
+
+    <!-- ===== KEYS ===== -->
+    <section class="view" id="view-keys" role="tabpanel" aria-label="Keys">
+      <div class="row between wrap view__head" style="margin-bottom:var(--sp-5)">
+        <div>
+          <span class="eyebrow">For tinkerers</span>
+          <h2>API Keys</h2>
+          <p>Connect your own apps &amp; scripts to the hub. Keep these private.</p>
+        </div>
+        <button class="btn btn--primary" id="genKey">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Generate key
+        </button>
+      </div>
+      <div class="card" id="keyList"></div>
+    </section>
+
+    <!-- ===== ADMIN ===== -->
+    <section class="view" id="view-admin" role="tabpanel" aria-label="Admin">
+      <div class="view__head">
+        <span class="eyebrow">Household admin</span>
+        <h2>People &amp; Devices</h2>
+        <p>Approve new devices joining the WiFi and set what each person can do.</p>
+      </div>
+
+      <h3 style="margin-bottom:var(--sp-3)">Waiting for approval</h3>
+      <div class="dev-grid" id="pendingDevices"></div>
+
+      <div class="divider"></div>
+
+      <h3 style="margin-bottom:var(--sp-3)">Household members</h3>
+      <div class="dev-grid" id="memberDevices"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================ ACCESS MODAL ============================ -->
+<div class="overlay" id="accessOverlay" role="dialog" aria-modal="true" aria-labelledby="accessTitle">
+  <div class="modal">
+    <div class="modal__head">
+      <span class="avatar" id="accessAvatar" style="width:46px;height:46px;border-radius:16px">A</span>
+      <div style="flex:1">
+        <h3 id="accessTitle">Access for Avery</h3>
+        <p class="muted" style="font-size:var(--fs-sm)" id="accessSub">iPad &middot; joined just now</p>
+      </div>
+      <button class="icon-btn" id="accessClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <label class="label" for="roleSelect">Role</label>
+      <div class="select-wrap">
+        <select class="field" id="roleSelect">
+          <option value="guest">Guest &mdash; chat only, nothing saved</option>
+          <option value="member" selected>Member &mdash; everyday family access</option>
+          <option value="admin">Admin &mdash; full control of the hub</option>
+        </select>
+      </div>
+
+      <label class="label mt-4">What can they do?</label>
+      <div class="priv-grid" id="privGrid"></div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" id="accessDeny">Remove device</button>
+      <button class="btn btn--primary" id="accessSave">Save access</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ SETTINGS MODAL ============================ -->
+<div class="overlay" id="settingsOverlay" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="modal">
+    <div class="modal__head">
+      <div style="flex:1">
+        <h3 id="settingsTitle">Make it yours</h3>
+        <p class="muted" style="font-size:var(--fs-sm)">Pick a look for the whole hub. Saved on this device.</p>
+      </div>
+      <button class="icon-btn" id="settingsClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <label class="label">Theme</label>
+      <div class="opt-grid" id="paletteGrid">
+        <button class="opt" data-palette="cubby" aria-pressed="false">
+          <span class="sw"><i style="background:#EEF0F4"></i><i style="background:#3B5BD9"></i><i style="background:#F2B632"></i></span>
+          <span class="nm">Cubby</span><span class="ds">Cobalt &amp; marigold, playful</span>
+        </button>
+        <button class="opt" data-palette="greenhouse" aria-pressed="false">
+          <span class="sw"><i style="background:#EAEFE7"></i><i style="background:#356B57"></i><i style="background:#E0A56B"></i></span>
+          <span class="nm">Greenhouse</span><span class="ds">Sage &amp; green, calm</span>
+        </button>
+        <button class="opt" data-palette="hearth" aria-pressed="false">
+          <span class="sw"><i style="background:#F4EDE1"></i><i style="background:#C2673B"></i><i style="background:#5C7A6B"></i></span>
+          <span class="nm">Hearth</span><span class="ds">Warm oat &amp; terracotta</span>
+        </button>
+      </div>
+
+      <label class="label mt-5">Appearance</label>
+      <div class="seg" id="modeSeg" role="group" aria-label="Appearance">
+        <button data-mode="system" aria-pressed="true">Auto</button>
+        <button data-mode="light" aria-pressed="false">Light</button>
+        <button data-mode="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--primary" id="settingsDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   Tiny helpers
+   ============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const el = (tag, attrs = {}, html) => {
+  const n = document.createElement(tag);
+  for (const k in attrs) {
+    if (k === "class") n.className = attrs[k];
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+    else if (attrs[k] != null) n.setAttribute(k, attrs[k]);
+  }
+  if (html != null) n.innerHTML = html;
+  return n;
+};
+const root = document.documentElement;
+const AV = ["#3B5BD9", "#E0843A", "#2E9E6B", "#C2673B", "#8C56D9", "#1FA2B8", "#D6453B", "#5C7A6B"];
+
+function toast(msg) {
+  const t = el("div", { class: "toast" }, `<span class="dot"></span>${msg}`);
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.transition = "opacity .3s, transform .3s"; t.style.opacity = "0"; t.style.transform = "translateY(8px)"; }, 2400);
+  setTimeout(() => t.remove(), 2800);
+}
+
+/* ============================================================
+   Theme / palette / mode
+   ============================================================ */
+const Theme = {
+  palette: localStorage.getItem("hh_palette") || "cubby",
+  mode: localStorage.getItem("hh_mode") || "light",
+  mql: matchMedia("(prefers-color-scheme: dark)"),
+  resolved() { return this.mode === "system" ? (this.mql.matches ? "dark" : "light") : this.mode; },
+  apply() {
+    root.setAttribute("data-palette", this.palette);
+    root.setAttribute("data-mode", this.resolved());
+    localStorage.setItem("hh_palette", this.palette);
+    localStorage.setItem("hh_mode", this.mode);
+    $$("#paletteGrid .opt").forEach(b => b.setAttribute("aria-pressed", b.dataset.palette === this.palette));
+    $$("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === this.mode));
+    const tc = { cubby: "#3B5BD9", greenhouse: "#356B57", hearth: "#C2673B" }[this.palette];
+    $('meta[name="theme-color"]').setAttribute("content", this.resolved() === "dark" ? "#141824" : tc);
+  },
+  setPalette(p) { this.palette = p; this.apply(); },
+  setMode(m) { this.mode = m; this.apply(); },
+  toggleMode() { this.setMode(this.resolved() === "dark" ? "light" : "dark"); }
+};
+Theme.mql.addEventListener("change", () => { if (Theme.mode === "system") Theme.apply(); });
+Theme.apply();
+
+$("#themeBtn").addEventListener("click", () => Theme.toggleMode());
+$("#settingsBtn").addEventListener("click", () => openOverlay("#settingsOverlay"));
+$("#settingsClose").addEventListener("click", () => closeOverlay("#settingsOverlay"));
+$("#settingsDone").addEventListener("click", () => closeOverlay("#settingsOverlay"));
+$$("#paletteGrid .opt").forEach(b => b.addEventListener("click", () => Theme.setPalette(b.dataset.palette)));
+$$("#modeSeg button").forEach(b => b.addEventListener("click", () => Theme.setMode(b.dataset.mode)));
+
+/* Overlay open/close (focus mgmt) */
+let lastFocus = null;
+function openOverlay(sel) {
+  lastFocus = document.activeElement;
+  const o = $(sel); o.classList.add("open");
+  const f = o.querySelector("button, [href], input, select, textarea");
+  if (f) setTimeout(() => f.focus(), 40);
+  document.addEventListener("keydown", escClose);
+}
+function closeOverlay(sel) {
+  $(sel).classList.remove("open");
+  document.removeEventListener("keydown", escClose);
+  if (lastFocus) lastFocus.focus();
+}
+function escClose(e) { if (e.key === "Escape") $$(".overlay.open").forEach(o => closeOverlay("#" + o.id)); }
+$$(".overlay").forEach(o => o.addEventListener("mousedown", e => { if (e.target === o) closeOverlay("#" + o.id); }));
+
+/* ============================================================
+   State
+   ============================================================ */
+const State = { user: null, avatar: AV[0], claimAdmin: false };
+
+/* ============================================================
+   GATE
+   ============================================================ */
+const avatarRow = $("#avatarRow");
+AV.slice(0, 8).forEach((c, i) => {
+  const b = el("button", { class: "avatar-pick", style: `background:${c}`, "aria-pressed": i === 0 ? "true" : "false", "aria-label": "Avatar color", type: "button" });
+  b.addEventListener("click", () => {
+    $$(".avatar-pick").forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    State.avatar = c;
+    setAvatarGlyph();
+  });
+  avatarRow.appendChild(b);
+});
+function setAvatarGlyph() {
+  const n = ($("#nameInput").value.trim()[0] || "?").toUpperCase();
+  $$(".avatar-pick").forEach(x => x.textContent = x.getAttribute("aria-pressed") === "true" ? n : "");
+}
+$("#nameInput").addEventListener("input", setAvatarGlyph);
+$("#nameInput").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
+setAvatarGlyph();
+
+$("#adminToggle").addEventListener("click", () => {
+  const note = $("#adminNote"), btn = $("#adminToggle");
+  const open = note.classList.toggle("show");
+  btn.setAttribute("aria-expanded", open);
+});
+$("#enterBtn").addEventListener("click", enter);
+
+function enter() {
+  const name = $("#nameInput").value.trim();
+  if (!name) { $("#nameInput").focus(); toast("Tell us your name first 🙂"); return; }
+  const isAdmin = $("#claimAdmin").checked;
+  State.user = { name, role: isAdmin ? "admin" : "member" };
+  // show app
+  $("#gate").style.display = "none";
+  $("#app").classList.add("show");
+  // header avatar
+  const av = $("#meAvatar");
+  av.textContent = name[0].toUpperCase();
+  av.style.background = State.avatar;
+  // greeting
+  $("#chatGreet").textContent = `Hi ${name.split(" ")[0]} — ask me anything`;
+  // admin tab
+  $("#adminTab").classList.toggle("hide", !isAdmin);
+  toast(isAdmin ? "Welcome, admin! You can approve devices in Admin." : `Welcome home, ${name.split(" ")[0]}!`);
+}
+$("#meAvatar").addEventListener("click", () => openOverlay("#settingsOverlay"));
+
+/* ============================================================
+   TABS / VIEWS
+   ============================================================ */
+$$("#tabs .tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    $$("#tabs .tab").forEach(t => t.setAttribute("aria-selected", "false"));
+    tab.setAttribute("aria-selected", "true");
+    $$(".view").forEach(v => v.classList.remove("active"));
+    $("#view-" + tab.dataset.view).classList.add("active");
+    window.scrollTo({ top: 0 });
+  });
+});
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+const chatLog = $("#chatLog"), chatInput = $("#chatInput");
+const synth = window.speechSynthesis;
+const REPLIES = [
+  "Sure! Here's a quick idea: roast the veggies at 220°C for about 25 minutes, then toss with olive oil and a squeeze of lemon. Want a shopping list?",
+  "Got it. I've jotted that down — you can find it later under Notes. Anything else for the weekend plan?",
+  "Happy to help with homework! Let's break it into steps. What's the first question you're stuck on?",
+  "The weather looks clear this afternoon — a good window for that bike ride. Want me to set a reminder?"
+];
+let replyIdx = 0;
+
+function addMsg(text, who) {
+  const wrap = el("div", { class: "msg msg--" + who });
+  const bubble = el("div", { class: "bubble" });
+  bubble.textContent = text;
+  if (who === "ai") {
+    const tools = el("div", { class: "bubble__tools" });
+    const read = el("button", { type: "button" }, `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6M19 7a8 8 0 0 1 0 10"/></svg>Read aloud`);
+    read.addEventListener("click", () => speak(text));
+    const copy = el("button", { type: "button" }, `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Copy`);
+    copy.addEventListener("click", () => { navigator.clipboard?.writeText(text); toast("Copied"); });
+    tools.append(read, copy);
+    bubble.appendChild(tools);
+  }
+  wrap.appendChild(bubble);
+  chatLog.appendChild(wrap);
+  chatLog.parentElement.scrollTop = 1e9;
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  return bubble;
+}
+function speak(text) {
+  if (!synth) { toast("Read-aloud isn't available on this browser"); return; }
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1; u.pitch = 1;
+  synth.speak(u);
+}
+function botReply(userText) {
+  const wrap = el("div", { class: "msg msg--ai" });
+  const bubble = el("div", { class: "bubble" }, '<div class="typing"><span></span><span></span><span></span></div>');
+  wrap.appendChild(bubble); chatLog.appendChild(wrap);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  setTimeout(() => {
+    wrap.remove();
+    const text = REPLIES[replyIdx++ % REPLIES.length];
+    addMsg(text, "ai");
+    if ($("#speakToggle").checked) speak(text);
+  }, 900);
+}
+addMsg("Hi! I'm your home assistant. I live on this network — ask me about dinner, homework, the calendar, anything. 🏡", "ai");
+
+$("#composer").addEventListener("submit", e => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text) return;
+  addMsg(text, "me");
+  chatInput.value = ""; chatInput.style.height = "auto";
+  botReply(text);
+});
+chatInput.addEventListener("input", () => {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + "px";
+});
+chatInput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#composer").requestSubmit(); }
+});
+
+/* Mic — Web Speech API if available */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false;
+const micBtn = $("#micBtn");
+if (SR) {
+  recog = new SR();
+  recog.continuous = false; recog.interimResults = true; recog.lang = "en-US";
+  recog.addEventListener("result", e => {
+    let s = "";
+    for (const r of e.results) s += r[0].transcript;
+    chatInput.value = s;
+    chatInput.dispatchEvent(new Event("input"));
+  });
+  recog.addEventListener("end", () => stopMic());
+  recog.addEventListener("error", () => { stopMic(); toast("Didn't catch that — try again"); });
+}
+function startMic() {
+  if (!recog) { toast("Voice input isn't supported on this browser — you can still type 🙂"); return; }
+  try { recog.start(); listening = true; micBtn.classList.add("live"); micBtn.setAttribute("aria-pressed", "true"); }
+  catch (e) {}
+}
+function stopMic() { if (recog) try { recog.stop(); } catch (e) {} listening = false; micBtn.classList.remove("live"); micBtn.setAttribute("aria-pressed", "false"); }
+micBtn.addEventListener("click", () => listening ? stopMic() : startMic());
+$("#speakToggle").addEventListener("change", e => { if (!e.target.checked && synth) synth.cancel(); });
+
+/* ============================================================
+   NOTES
+   ============================================================ */
+const NOTE_COLORS = ["#FDE8B5", "#CFE9D6", "#CFE0FB", "#F6D2D6", "#E7D7F4", "#FBE0C8"];
+let notes = [
+  { t: "WiFi password", b: "It's on the fridge magnet 🧲 — ask a grown-up if you can't find it.", c: NOTE_COLORS[2], who: "Dad", pin: true },
+  { t: "Grocery ideas", b: "Pasta, tomatoes, the good bread, oat milk, apples for school lunches.", c: NOTE_COLORS[1], who: "Maya", pin: false },
+  { t: "Saturday plan", b: "Soccer at 10, library after, pizza night! 🍕", c: NOTE_COLORS[0], who: "Mom", pin: true },
+  { t: "Plant watering", b: "Big fern = Mondays. Little ones = when the soil's dry.", c: NOTE_COLORS[5], who: "Sam", pin: false },
+  { t: "Bedtime story queue", b: "Finish the dragon book, then start the one about the lighthouse.", c: NOTE_COLORS[4], who: "Dad", pin: false }
+];
+function renderNotes() {
+  const board = $("#noteBoard"); board.innerHTML = "";
+  [...notes].sort((a, b) => b.pin - a.pin).forEach((n, i) => {
+    const card = el("div", { class: "note", style: `--note-c:${n.c}` });
+    card.innerHTML = `
+      <button class="note__pin ${n.pin ? "pinned" : ""}" aria-label="${n.pin ? "Unpin" : "Pin"} note" aria-pressed="${n.pin}">
+        <svg viewBox="0 0 24 24" fill="${n.pin ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3z"/></svg>
+      </button>
+      <h4>${n.t}</h4><p>${n.b}</p>
+      <div class="note__meta">${n.who} · just now</div>`;
+    card.querySelector(".note__pin").addEventListener("click", () => { n.pin = !n.pin; renderNotes(); });
+    board.appendChild(card);
+  });
+}
+renderNotes();
+$("#addNote").addEventListener("click", () => {
+  const t = prompt("Note title?"); if (!t) return;
+  const b = prompt("What should it say?") || "";
+  notes.unshift({ t, b, c: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)], who: State.user?.name.split(" ")[0] || "You", pin: false });
+  renderNotes(); toast("Note added to the board");
+});
+
+/* ============================================================
+   CHECKLISTS
+   ============================================================ */
+let lists = [
+  { title: "Pack for the trip 🧳", items: [["Sunscreen", true], ["Phone chargers", true], ["Snacks for the car", false], ["Beach towels", false], ["First-aid kit", false]] },
+  { title: "Saturday chores", items: [["Take out recycling", true], ["Tidy living room", false], ["Water the plants", false], ["Wash the car", false]] }
+];
+function renderLists() {
+  const wrap = $("#listsWrap"); wrap.innerHTML = "";
+  lists.forEach((l, li) => {
+    const done = l.items.filter(i => i[1]).length;
+    const pct = Math.round(done / l.items.length * 100);
+    const card = el("div", { class: "card card--pad" });
+    card.innerHTML = `
+      <div class="list__head"><h3>${l.title}</h3><span class="chip chip--accent">${done}/${l.items.length}</span></div>
+      <div class="list__progress"><i style="width:${pct}%"></i></div>`;
+    l.items.forEach((it, ii) => {
+      const row = el("label", { class: "list__item check" });
+      row.innerHTML = `
+        <input type="checkbox" ${it[1] ? "checked" : ""}>
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>
+        <span class="txt">${it[0]}</span>`;
+      row.querySelector("input").addEventListener("change", e => { it[1] = e.target.checked; renderLists(); });
+      card.appendChild(row);
+    });
+    const add = el("button", { class: "btn btn--ghost mt-4", style: "width:100%" }, "+ Add item");
+    add.addEventListener("click", () => { const v = prompt("New item?"); if (v) { l.items.push([v, false]); renderLists(); } });
+    card.appendChild(add);
+    wrap.appendChild(card);
+  });
+}
+renderLists();
+$("#addList").addEventListener("click", () => {
+  const t = prompt("Name the checklist?"); if (!t) return;
+  lists.unshift({ title: t, items: [["First thing to do", false]] });
+  renderLists(); toast("New checklist started");
+});
+
+/* ============================================================
+   FILES & PHOTOS
+   ============================================================ */
+const FILE_ICONS = {
+  photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="m21 16-5-5L5 19"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+  pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+  vid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>',
+  audio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>'
+};
+const TINTS = ["#3B5BD9", "#E0843A", "#2E9E6B", "#C2673B", "#8C56D9", "#1FA2B8", "#D6537B", "#5C7A6B"];
+let files = [
+  { n: "Beach day.jpg", t: "photo", s: "3.2 MB", ext: "JPG" },
+  { n: "Family recipe book.pdf", t: "pdf", s: "1.1 MB", ext: "PDF" },
+  { n: "Maya birthday.mp4", t: "vid", s: "48 MB", ext: "MP4" },
+  { n: "Garden plan.png", t: "photo", s: "2.0 MB", ext: "PNG" },
+  { n: "Insurance docs.pdf", t: "pdf", s: "640 KB", ext: "PDF" },
+  { n: "Sam piano.m4a", t: "audio", s: "5.4 MB", ext: "M4A" },
+  { n: "School calendar.docx", t: "doc", s: "88 KB", ext: "DOC" },
+  { n: "Sunset hike.jpg", t: "photo", s: "4.1 MB", ext: "JPG" },
+  { n: "Camping checklist.docx", t: "doc", s: "32 KB", ext: "DOC" },
+  { n: "Puppy first day.jpg", t: "photo", s: "2.8 MB", ext: "JPG" }
+];
+function renderFiles(q = "") {
+  const grid = $("#fileGrid"); grid.innerHTML = "";
+  const list = files.filter(f => f.n.toLowerCase().includes(q.toLowerCase()));
+  $("#fileEmpty").classList.toggle("hide", list.length > 0);
+  $("#fileCount").textContent = q
+    ? `${list.length} result${list.length === 1 ? "" : "s"} for “${q}”`
+    : `${files.length} items · ${files.filter(f => f.t === "photo").length} photos`;
+  list.forEach((f, i) => {
+    const tint = TINTS[(f.n.charCodeAt(0) + i) % TINTS.length];
+    const tile = el("div", { class: "tile", role: "button", tabindex: "0" });
+    tile.innerHTML = `
+      <div class="tile__thumb" style="background:${tint}">${FILE_ICONS[f.t]}<span class="ext">${f.ext}</span></div>
+      <div class="tile__meta"><div class="nm" title="${f.n}">${f.n}</div><div class="sz">${f.s}</div></div>`;
+    tile.addEventListener("click", () => toast(`Opening “${f.n}”`));
+    grid.appendChild(tile);
+  });
+}
+renderFiles();
+$("#fileSearch").addEventListener("input", e => renderFiles(e.target.value));
+function fakeUpload() {
+  const names = ["New photo.jpg", "Scan.pdf", "Voice memo.m4a", "Drawing.png"];
+  const n = names[Math.floor(Math.random() * names.length)];
+  const t = n.endsWith(".pdf") ? "pdf" : n.endsWith(".m4a") ? "audio" : "photo";
+  files.unshift({ n, t, s: (Math.random() * 4 + 0.3).toFixed(1) + " MB", ext: n.split(".").pop().toUpperCase() });
+  renderFiles($("#fileSearch").value); toast(`Uploaded “${n}”`);
+}
+$("#uploadBtn").addEventListener("click", fakeUpload);
+const dz = $("#dropzone");
+dz.addEventListener("click", fakeUpload);
+dz.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fakeUpload(); } });
+["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
+dz.addEventListener("drop", e => { const c = e.dataTransfer?.files?.length || 1; for (let i = 0; i < c; i++) fakeUpload(); });
+
+/* ============================================================
+   KEYS
+   ============================================================ */
+let keys = [{ name: "Home Assistant bridge", key: "hh_live_8Kd2…a91F", created: "3 days ago" }];
+function randKey() {
+  const c = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789";
+  let s = ""; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)];
+  return "hh_live_" + s;
+}
+function renderKeys() {
+  const list = $("#keyList"); list.innerHTML = "";
+  if (!keys.length) { list.innerHTML = '<p class="empty">No keys yet. Generate one to connect an app.</p>'; return; }
+  keys.forEach((k, i) => {
+    const row = el("div", { class: "keyrow" });
+    row.innerHTML = `
+      <div><div class="kn">${k.name}</div><div class="muted" style="font-size:var(--fs-xs)">Created ${k.created}</div></div>
+      <code>${k.key}</code>
+      <span class="spacer"></span>
+      <button class="icon-btn" data-act="copy" aria-label="Copy key"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></button>
+      <button class="icon-btn" data-act="del" aria-label="Revoke key" style="color:var(--danger)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>`;
+    row.querySelector('[data-act="copy"]').addEventListener("click", () => { navigator.clipboard?.writeText(k.key); toast("Key copied"); });
+    row.querySelector('[data-act="del"]').addEventListener("click", () => { keys.splice(i, 1); renderKeys(); toast("Key revoked"); });
+    list.appendChild(row);
+  });
+}
+renderKeys();
+$("#genKey").addEventListener("click", () => {
+  const name = prompt("Name this key (what's it for?)", "My app") || "Untitled key";
+  const full = randKey();
+  keys.unshift({ name, key: full, created: "just now" });
+  renderKeys();
+  navigator.clipboard?.writeText(full);
+  toast("New key generated & copied");
+});
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+const PRIVS = [
+  ["chat", "Use Chat", true], ["voice", "Voice & read-aloud", true],
+  ["notes", "Create notes", true], ["lists", "Edit checklists", true],
+  ["files_view", "View files & photos", true], ["files_upload", "Upload files", true],
+  ["keys", "Generate API keys", false], ["admin", "Admin powers", false]
+];
+const ROLE_PRESET = {
+  guest: { chat: true, voice: true, notes: false, lists: false, files_view: false, files_upload: false, keys: false, admin: false },
+  member: { chat: true, voice: true, notes: true, lists: true, files_view: true, files_upload: true, keys: false, admin: false },
+  admin: { chat: true, voice: true, notes: true, lists: true, files_view: true, files_upload: true, keys: true, admin: true }
+};
+let pending = [
+  { name: "Avery", dev: "iPad", icon: "tablet", color: AV[4] },
+  { name: "Grandma", dev: "Windows laptop", icon: "laptop", color: AV[1] }
+];
+let members = [
+  { name: "Maya", dev: "iPhone", icon: "phone", color: AV[0], role: "member" },
+  { name: "Sam", dev: "Android phone", icon: "phone", color: AV[2], role: "member" },
+  { name: "Dad", dev: "MacBook", icon: "laptop", color: AV[3], role: "admin" }
+];
+const DEV_ICON = {
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>',
+  tablet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/></svg>',
+  laptop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1"/><path d="M2 20h20"/></svg>'
+};
+function devCard(p, kind) {
+  const card = el("div", { class: "dev" });
+  const roleChip = p.role ? `<span class="chip ${p.role === "admin" ? "chip--accent" : ""}">${p.role}</span>` : '<span class="chip chip--warn">pending</span>';
+  card.innerHTML = `
+    <span class="dev__ico" style="background:${p.color}1f;color:${p.color}">${DEV_ICON[p.icon]}</span>
+    <div class="dev__main"><div class="nm">${p.name}</div><div class="sub">${p.dev}${p.role ? "" : " · wants to join"}</div></div>
+    <div class="dev__actions"></div>`;
+  const actions = card.querySelector(".dev__actions");
+  if (kind === "pending") {
+    actions.appendChild(el("button", { class: "btn btn--primary", onClick: () => openAccess(p, "pending") }, "Review"));
+  } else {
+    actions.querySelector;
+    const chip = el("span"); chip.innerHTML = roleChip; actions.appendChild(chip.firstElementChild);
+    actions.appendChild(el("button", { class: "icon-btn", "aria-label": "Manage access", onClick: () => openAccess(p, "member") },
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4 12H1M23 12h-3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>'));
+  }
+  return card;
+}
+function renderAdmin() {
+  const pd = $("#pendingDevices"); pd.innerHTML = "";
+  if (!pending.length) pd.innerHTML = '<p class="muted">No devices waiting. All caught up! ✅</p>';
+  pending.forEach(p => pd.appendChild(devCard(p, "pending")));
+  const md = $("#memberDevices"); md.innerHTML = "";
+  members.forEach(m => md.appendChild(devCard(m, "member")));
+}
+renderAdmin();
+
+/* Access modal */
+let accessTarget = null, accessKind = null;
+function buildPrivGrid(state) {
+  const grid = $("#privGrid"); grid.innerHTML = "";
+  PRIVS.forEach(([key, label]) => {
+    const lab = el("label", { class: "priv" });
+    lab.innerHTML = `
+      <span class="check"><input type="checkbox" data-priv="${key}" ${state[key] ? "checked" : ""}>
+      <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span></span>
+      <span class="priv__txt">${label}</span>`;
+    grid.appendChild(lab);
+  });
+}
+function openAccess(target, kind) {
+  accessTarget = target; accessKind = kind;
+  const role = target.role || "member";
+  $("#accessTitle").textContent = `Access for ${target.name}`;
+  $("#accessSub").textContent = `${target.dev} · ${kind === "pending" ? "wants to join" : "in the household"}`;
+  const av = $("#accessAvatar"); av.textContent = target.name[0].toUpperCase(); av.style.background = target.color;
+  $("#roleSelect").value = role;
+  buildPrivGrid(ROLE_PRESET[role]);
+  $("#accessDeny").textContent = kind === "pending" ? "Deny" : "Remove device";
+  openOverlay("#accessOverlay");
+}
+$("#roleSelect").addEventListener("change", e => buildPrivGrid(ROLE_PRESET[e.target.value]));
+$("#accessClose").addEventListener("click", () => closeOverlay("#accessOverlay"));
+$("#accessSave").addEventListener("click", () => {
+  const role = $("#roleSelect").value;
+  if (accessKind === "pending") {
+    pending = pending.filter(x => x !== accessTarget);
+    members.push({ ...accessTarget, role });
+    toast(`${accessTarget.name} approved as ${role}`);
+  } else {
+    accessTarget.role = role;
+    toast(`Updated ${accessTarget.name}'s access`);
+  }
+  renderAdmin(); closeOverlay("#accessOverlay");
+});
+$("#accessDeny").addEventListener("click", () => {
+  if (accessKind === "pending") pending = pending.filter(x => x !== accessTarget);
+  else members = members.filter(x => x !== accessTarget);
+  toast(`${accessTarget.name}'s device removed`);
+  renderAdmin(); closeOverlay("#accessOverlay");
+});
+
+/* Focus name on load. Deep-links for demos & the mobile gallery:
+   #app, #app-admin, or #go/<role>/<tab>[/review]  e.g. #go/admin/admin/review */
+window.addEventListener("load", () => {
+  const h = location.hash;
+  const go = h.match(/^#go\/(\w+)\/([\w-]+)(?:\/(\w+))?/);
+  if (go) {
+    $("#nameInput").value = "Maya";
+    $("#claimAdmin").checked = go[1] === "admin";
+    enter();
+    const tab = $('#tabs .tab[data-view="' + go[2] + '"]');
+    if (tab) tab.click();
+    if (go[3] === "review") setTimeout(() => $('#pendingDevices .btn--primary')?.click(), 300);
+    if (go[3] === "settings") setTimeout(() => openOverlay("#settingsOverlay"), 200);
+  } else if (h.startsWith("#app")) {
+    $("#nameInput").value = "Maya";
+    $("#claimAdmin").checked = h === "#app-admin";
+    enter();
+  } else {
+    $("#nameInput").focus();
+  }
+});
+</script>
+</body>
+</html>

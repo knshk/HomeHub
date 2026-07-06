@@ -1,0 +1,92 @@
+# =============================================================================
+# home-hub.service - systemd unit for the Home LLM Hub (llm.home).
+#
+# Runs the FastAPI app via the project's venv uvicorn, as the non-root user
+# "kanishka". Config (including HUB_HOST/HUB_PORT and the gateway secrets) is
+# read from the project .env via EnvironmentFile.
+#
+# ----------------------------------------------------------------------------
+# :80 + setcap INTERACTION  (read this!)
+# ----------------------------------------------------------------------------
+# By default this unit binds HUB_PORT=8090 (a non-privileged port) so it runs
+# rootless with no special capability. To serve on :80 (so http://llm.home
+# works without a port), the product installer (deploy/install-llmhome.sh):
+#
+#   1. grants the *venv python* the bind capability ONCE:
+#        sudo setcap cap_net_bind_service=+ep \
+#            /home/kanishka/kk_works/LLMs/home-hub/.venv/bin/python3.<minor>
+#      (uvicorn execs this python; the capability rides along, so the process
+#       can bind :80 while still running as the unprivileged user.)
+#
+#   2. sets HUB_PORT=80 in the .env this unit reads.
+#
+# IMPORTANT: setcap is set on the REAL python binary the venv symlinks to. If
+# you rebuild/upgrade the venv or the system python, the capability is LOST and
+# :80 binds will fail with EACCES -> re-run deploy/install-llmhome.sh (it is
+# idempotent and re-applies setcap). If you prefer not to use setcap, run this
+# unit on 8090 and put nginx in front of it (see deploy/README-deploy.md).
+#
+# The ExecStart below reads $HUB_HOST/$HUB_PORT from the EnvironmentFile so you
+# do NOT have to edit this unit when switching 8090 <-> 80; just change .env.
+#
+# INSTALL (the product installer does this for you; manual path shown):
+#
+#   sudo install -D -m 0644 \
+#       deploy/home-hub.service /etc/systemd/system/home-hub.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now home-hub.service
+#   sudo systemctl status home-hub.service
+#   journalctl -u home-hub.service -f
+#
+# Prerequisites:
+#   - ./install.sh has been run (venv + deps + sqlite schema exist)
+#   - /home/kanishka/kk_works/LLMs/home-hub/.env exists, chmod 600, with the
+#     HUB_GATEWAY_KEY and HUB_ADMIN_TOKEN values filled in from the gateway.
+# =============================================================================
+[Unit]
+Description=Home LLM Hub (llm.home) - FastAPI/uvicorn family portal
+Documentation=file:///home/kanishka/kk_works/LLMs/home-hub/deploy/README-deploy.md
+# Start after the network and (best-effort) the gateway + Ollama it depends on.
+After=network-online.target qwen-gateway.service ollama.service
+Wants=network-online.target qwen-gateway.service ollama.service
+
+[Service]
+Type=simple
+User=kanishka
+Group=kanishka
+
+WorkingDirectory=/home/kanishka/kk_works/LLMs/home-hub
+EnvironmentFile=/home/kanishka/kk_works/LLMs/home-hub/.env
+
+# Sensible fallbacks if a var is missing from the EnvironmentFile.
+Environment=HUB_HOST=0.0.0.0
+Environment=HUB_PORT=8090
+
+# Bind host/port come from the .env (HUB_HOST/HUB_PORT). Using the shell form
+# so the variables expand; the app additionally reads the full config itself.
+ExecStart=/home/kanishka/kk_works/LLMs/home-hub/.venv/bin/uvicorn \
+    app.main:app --host ${HUB_HOST} --port ${HUB_PORT}
+
+Restart=on-failure
+RestartSec=3
+
+# --- :80 support -------------------------------------------------------------
+# When HUB_PORT=80 the bind needs CAP_NET_BIND_SERVICE. We rely on setcap on the
+# venv python (applied by the installer). If you would rather grant the
+# capability per-service instead of via setcap, UNCOMMENT the next two lines and
+# DROP the setcap step (they are mutually sufficient; do not need both):
+# AmbientCapabilities=CAP_NET_BIND_SERVICE
+# CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# --- Hardening (best-effort; relax if your app needs more) -------------------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ProtectControlGroups=true
+ProtectKernelTunables=true
+# Allow writes only to the project data + log dirs (sqlite db, uploads, logs).
+ReadWritePaths=/home/kanishka/kk_works/LLMs/home-hub/data /home/kanishka/kk_works/LLMs/home-hub/logs
+
+[Install]
+WantedBy=multi-user.target

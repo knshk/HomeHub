@@ -1,0 +1,50 @@
+generated_images:
+  format: PNG
+  path: /home/kanishka/kk_works/fastsdcpu/results
+  save_image: true
+  save_image_quality: 90
+lcm_diffusion_setting:
+  clip_skip: 1
+  controlnet: null
+  diffusion_task: text_to_image
+  dirs:
+    controlnet: /home/kanishka/kk_works/fastsdcpu/controlnet_models
+    lora: /home/kanishka/kk_works/fastsdcpu/lora_models
+  gguf_model:
+    clip_path: /home/kanishka/kk_works/fastsdcpu/models/gguf/clip/clip_l_q4_0.gguf
+    diffusion_path: /home/kanishka/kk_works/fastsdcpu/models/gguf/diffusion/flux1-schnell-q4_0.gguf
+    gguf_models: /home/kanishka/kk_works/fastsdcpu/models/gguf
+    t5xxl_path: /home/kanishka/kk_works/fastsdcpu/models/gguf/t5xxl/t5xxl_q4_0.gguf
+    vae_path: /home/kanishka/kk_works/fastsdcpu/models/gguf/vae/ae.safetensors
+  guidance_scale: 1.0
+  image_height: 512
+  image_width: 512
+  inference_steps: 4
+  init_image: null
+  lcm_lora:
+    base_model_id: Lykon/dreamshaper-8
+    lcm_lora_id: latent-consistency/lcm-lora-sdv1-5
+  lcm_model_id: stabilityai/sd-turbo
+  lora:
+    enabled: false
+    fuse: true
+    models_dir: /home/kanishka/kk_works/fastsdcpu/lora_models
+    path: ''
+    weight: 0.5
+  negative_prompt: ''
+  number_of_images: 1
+  openvino_lcm_model_id: rupeshs/sd-turbo-openvino
+  prompt: "children's storybook illustration, bold clean outlines, flat warm colors,\
+    \ big friendly eyes, centered, simple background \u2014 kids game mascot hedgehog"
+  rebuild_controlnet_pipeline: false
+  rebuild_pipeline: false
+  seed: 123123
+  strength: 0.6
+  token_merging: 0.0
+  use_gguf_model: true
+  use_lcm_lora: false
+  use_offline_model: false
+  use_openvino: false
+  use_safety_checker: false
+  use_seed: false
+  use_tiny_auto_encoder: false

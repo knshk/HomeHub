@@ -1,0 +1,54 @@
+# ===========================================================================
+# HomeHub appliance — commit source/config, exclude anything re-downloadable
+# or secret. (Models, venvs, and caches are recreated with a download / pip.)
+# ===========================================================================
+
+# --- Python virtual environments (recreate: python -m venv + pip install) ---
+.venv/
+env/
+**/.venv/
+**/env/
+
+# --- Model weights & large binaries (re-downloadable / rebuildable) ---
+*.gguf
+*.safetensors
+*.onnx
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.so
+*.dll
+*.dylib
+# Kokoro TTS onnx + voices bin, test audio (downloaded / regenerated)
+voice-svc/models/
+# FLUX GGUF stack (downloaded)
+models/gguf/
+*.wav
+
+# --- Python caches / build ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# --- Logs & runtime pids ---
+*.log
+logs/
+*.pid
+
+# --- SECRETS — never commit. Restore from the .env.example templates and
+#     re-mint tokens. (The .env files themselves say "keep out of version control".)
+.env
+**/.env
+
+# --- Archives / editor / OS cruft ---
+homeLLM.zip
+*.zip
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

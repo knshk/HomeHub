@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Qwen Stack — Admin</title>
+<style>
+  :root { --bg:#0f1117; --panel:#181b24; --line:#262a36; --fg:#e6e8ef;
+          --muted:#9aa0ad; --accent:#5b8cff; --danger:#e5534b; --ok:#3fb950; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         background:var(--bg); color:var(--fg); }
+  header { padding:16px 24px; border-bottom:1px solid var(--line);
+           display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  h1 { font-size:18px; margin:0; }
+  main { max-width:1100px; margin:0 auto; padding:24px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+           padding:18px; margin-bottom:20px; }
+  .panel h2 { margin:0 0 12px; font-size:15px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 4px; }
+  input { width:100%; padding:8px 10px; background:#0d0f15; border:1px solid var(--line);
+          color:var(--fg); border-radius:6px; }
+  button { cursor:pointer; border:none; border-radius:6px; padding:8px 14px;
+           background:var(--accent); color:#fff; font-weight:600; }
+  button.secondary { background:#2a2f3d; }
+  button.danger { background:var(--danger); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line);
+           font-size:13px; }
+  th { color:var(--muted); font-weight:600; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+  .row > div { flex:1; min-width:140px; }
+  .pill { padding:2px 8px; border-radius:999px; font-size:11px; }
+  .pill.live { background:rgba(63,185,80,.15); color:var(--ok); }
+  .pill.revoked { background:rgba(229,83,75,.15); color:var(--danger); }
+  .keybox { display:flex; gap:8px; align-items:center; margin-top:10px;
+            background:#0d0f15; border:1px dashed var(--accent); padding:10px;
+            border-radius:8px; }
+  .keybox code { font-size:13px; word-break:break-all; flex:1; }
+  .muted { color:var(--muted); }
+  .err { color:var(--danger); }
+  .hidden { display:none; }
+  .topinfo { margin-left:auto; display:flex; gap:8px; align-items:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Qwen Stack — Admin Console</h1>
+  <div class="topinfo">
+    <span id="tokenState" class="muted">no token</span>
+    <button id="logoutBtn" class="secondary hidden">Clear token</button>
+  </div>
+</header>
+
+<main>
+  <!-- Token gate -->
+  <section id="authPanel" class="panel">
+    <h2>Admin token</h2>
+    <p class="muted">Enter the ADMIN_TOKEN. It is kept only in this page's memory.</p>
+    <div class="row">
+      <div>
+        <label for="tokenInput">ADMIN_TOKEN</label>
+        <input id="tokenInput" type="password" placeholder="token" autocomplete="off" />
+      </div>
+      <div style="flex:0 0 auto;">
+        <button id="loginBtn">Connect</button>
+      </div>
+    </div>
+    <p id="authErr" class="err"></p>
+  </section>
+
+  <!-- App -->
+  <div id="app" class="hidden">
+    <section class="panel">
+      <h2>Create API key</h2>
+      <div class="row">
+        <div>
+          <label for="kName">Name</label>
+          <input id="kName" placeholder="e.g. my-app" />
+        </div>
+        <div>
+          <label for="kRpm">RPM limit (blank = default)</label>
+          <input id="kRpm" type="number" min="0" placeholder="60" />
+        </div>
+        <div>
+          <label for="kDaily">Daily token limit (0 = unlimited)</label>
+          <input id="kDaily" type="number" min="0" placeholder="0" />
+        </div>
+        <div style="flex:0 0 auto;">
+          <label>&nbsp;</label>
+          <button id="createBtn">Create key</button>
+        </div>
+      </div>
+      <div id="newKeyWrap" class="hidden">
+        <p class="muted">Copy this now — it will not be shown again:</p>
+        <div class="keybox">
+          <code id="newKeyVal"></code>
+          <button id="copyBtn" class="secondary">Copy</button>
+        </div>
+      </div>
+      <p id="createErr" class="err"></p>
+    </section>
+
+    <section class="panel">
+      <h2>API keys <button id="refreshKeys" class="secondary" style="float:right;">Refresh</button></h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Prefix</th><th>Created</th>
+              <th>RPM</th><th>Daily tokens</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody id="keysBody"></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Usage <button id="refreshUsage" class="secondary" style="float:right;">Refresh</button></h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Key</th><th>Time (UTC)</th><th>Model</th>
+              <th>Prompt</th><th>Completion</th><th>Status</th></tr>
+        </thead>
+        <tbody id="usageBody"></tbody>
+      </table>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  let token = "";
+
+  const $ = (id) => document.getElementById(id);
+
+  function setTokenState() {
+    $("tokenState").textContent = token ? "connected" : "no token";
+    $("logoutBtn").classList.toggle("hidden", !token);
+  }
+
+  function headers() {
+    return { "Authorization": "Bearer " + token, "Content-Type": "application/json" };
+  }
+
+  async function api(path, opts) {
+    opts = opts || {};
+    opts.headers = headers();
+    const res = await fetch("/admin" + path, opts);
+    let body = null;
+    try { body = await res.json(); } catch (e) { body = null; }
+    if (!res.ok) {
+      const msg = (body && body.error && body.error.message) || ("HTTP " + res.status);
+      throw new Error(msg);
+    }
+    return body;
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  async function login() {
+    $("authErr").textContent = "";
+    token = $("tokenInput").value.trim();
+    if (!token) { $("authErr").textContent = "Enter a token."; return; }
+    try {
+      await api("/keys", { method: "GET" });
+      setTokenState();
+      $("authPanel").classList.add("hidden");
+      $("app").classList.remove("hidden");
+      await Promise.all([loadKeys(), loadUsage()]);
+    } catch (e) {
+      token = "";
+      setTokenState();
+      $("authErr").textContent = "Auth failed: " + e.message;
+    }
+  }
+
+  function logout() {
+    token = "";
+    setTokenState();
+    $("app").classList.add("hidden");
+    $("authPanel").classList.remove("hidden");
+    $("tokenInput").value = "";
+  }
+
+  async function loadKeys() {
+    const data = await api("/keys", { method: "GET" });
+    const body = $("keysBody");
+    body.innerHTML = "";
+    (data.keys || []).forEach((k) => {
+      const tr = document.createElement("tr");
+      const revoked = k.revoked == 1 || k.revoked === true;
+      tr.innerHTML =
+        "<td>" + esc(k.id) + "</td>" +
+        "<td>" + esc(k.name) + "</td>" +
+        "<td><code>" + esc(k.key_prefix) + "…</code></td>" +
+        "<td class='muted'>" + esc(k.created_at) + "</td>" +
+        "<td>" + esc(k.rpm_limit) + "</td>" +
+        "<td>" + esc(k.daily_token_limit) + "</td>" +
+        "<td><span class='pill " + (revoked ? "revoked" : "live") + "'>" +
+          (revoked ? "revoked" : "live") + "</span></td>" +
+        "<td></td>";
+      const actionCell = tr.lastElementChild;
+      if (!revoked) {
+        const btn = document.createElement("button");
+        btn.className = "danger";
+        btn.textContent = "Revoke";
+        btn.onclick = async () => {
+          if (!confirm("Revoke key #" + k.id + "?")) return;
+          btn.disabled = true;
+          try { await api("/keys/" + k.id + "/revoke", { method: "POST" }); await loadKeys(); }
+          catch (e) { alert("Revoke failed: " + e.message); btn.disabled = false; }
+        };
+        actionCell.appendChild(btn);
+      }
+      body.appendChild(tr);
+    });
+  }
+
+  async function loadUsage() {
+    const data = await api("/usage?limit=200", { method: "GET" });
+    const body = $("usageBody");
+    body.innerHTML = "";
+    (data.usage || []).forEach((u) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + esc(u.id) + "</td>" +
+        "<td>" + esc(u.key_name || ("#" + (u.key_id == null ? "?" : u.key_id))) + "</td>" +
+        "<td class='muted'>" + esc(u.ts) + "</td>" +
+        "<td>" + esc(u.model) + "</td>" +
+        "<td>" + esc(u.prompt_tokens) + "</td>" +
+        "<td>" + esc(u.completion_tokens) + "</td>" +
+        "<td>" + esc(u.status) + "</td>";
+      body.appendChild(tr);
+    });
+  }
+
+  async function createKey() {
+    $("createErr").textContent = "";
+    $("newKeyWrap").classList.add("hidden");
+    const name = $("kName").value.trim();
+    if (!name) { $("createErr").textContent = "Name is required."; return; }
+    const payload = { name: name };
+    const rpm = $("kRpm").value.trim();
+    if (rpm !== "") payload.rpm_limit = parseInt(rpm, 10);
+    const daily = $("kDaily").value.trim();
+    if (daily !== "") payload.daily_token_limit = parseInt(daily, 10);
+    $("createBtn").disabled = true;
+    try {
+      const res = await api("/keys", { method: "POST", body: JSON.stringify(payload) });
+      $("newKeyVal").textContent = res.api_key;
+      $("newKeyWrap").classList.remove("hidden");
+      $("kName").value = ""; $("kRpm").value = ""; $("kDaily").value = "";
+      await loadKeys();
+    } catch (e) {
+      $("createErr").textContent = "Create failed: " + e.message;
+    } finally {
+      $("createBtn").disabled = false;
+    }
+  }
+
+  function copyKey() {
+    const val = $("newKeyVal").textContent;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(val).then(
+        () => { $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy", 1500); },
+        () => { $("copyBtn").textContent = "Copy failed"; }
+      );
+    } else {
+      const r = document.createRange(); r.selectNode($("newKeyVal"));
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      try { document.execCommand("copy"); $("copyBtn").textContent = "Copied"; } catch (e) {}
+    }
+  }
+
+  $("loginBtn").onclick = login;
+  $("tokenInput").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+  $("logoutBtn").onclick = logout;
+  $("createBtn").onclick = createKey;
+  $("copyBtn").onclick = copyKey;
+  $("refreshKeys").onclick = loadKeys;
+  $("refreshUsage").onclick = loadUsage;
+  setTokenState();
+})();
+</script>
+</body>
+</html>

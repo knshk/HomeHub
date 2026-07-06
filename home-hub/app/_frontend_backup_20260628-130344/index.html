@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Home LLM Hub</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127968;</text></svg>">
+</head>
+<body>
+
+  <!-- ============================================================= -->
+  <!-- First-visit / unauthenticated gate                            -->
+  <!-- ============================================================= -->
+  <div id="gate" class="gate" hidden>
+    <div class="gate-card">
+      <div class="gate-logo" aria-hidden="true">&#127968;</div>
+      <h1>Home LLM Hub</h1>
+      <p class="gate-sub">Your family's private AI portal.</p>
+
+      <!-- Register (default) -->
+      <form id="gate-register-form" class="gate-form" autocomplete="off">
+        <label for="gate-username">Pick a username</label>
+        <input id="gate-username" name="username" type="text" inputmode="text"
+               autocapitalize="none" autocomplete="username" placeholder="e.g. alex"
+               maxlength="40" required>
+        <button type="submit" class="btn btn-primary btn-block">Enter</button>
+        <p class="gate-hint">
+          New devices start as a <strong>pending guest</strong> until an admin approves them.
+        </p>
+      </form>
+
+      <button id="gate-show-admin" type="button" class="btn-link gate-admin-toggle">
+        I'm the admin
+      </button>
+
+      <!-- Admin claim (hidden until toggled) -->
+      <form id="gate-admin-form" class="gate-form" autocomplete="off" hidden>
+        <label for="gate-admin-username">Username</label>
+        <input id="gate-admin-username" name="username" type="text"
+               autocapitalize="none" autocomplete="username" placeholder="admin name"
+               maxlength="40" required>
+        <label for="gate-admin-token">Admin token</label>
+        <input id="gate-admin-token" name="admin_token" type="password"
+               autocomplete="off" placeholder="admin or bootstrap token" required>
+        <button type="submit" class="btn btn-primary btn-block">Claim admin</button>
+        <button id="gate-hide-admin" type="button" class="btn-link">Back</button>
+      </form>
+
+      <p id="gate-error" class="form-error" role="alert" hidden></p>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- Main app shell (shown once registered)                        -->
+  <!-- ============================================================= -->
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-mark" aria-hidden="true">&#127968;</span>
+        <span class="brand-name">LLM Hub</span>
+      </div>
+
+      <nav class="tabs" id="tabs" aria-label="Sections">
+        <button class="tab" data-tab="chat"       data-priv="chat">Chat</button>
+        <button class="tab" data-tab="notes"      data-priv="notes">Notes</button>
+        <button class="tab" data-tab="checklists" data-priv="checklists">Checklists</button>
+        <button class="tab" data-tab="files"      data-priv="files_read">Files &amp; Photos</button>
+        <button class="tab" data-tab="keys"       data-priv="api_keys">Keys</button>
+        <button class="tab" data-tab="admin"      data-role="admin">Admin</button>
+      </nav>
+
+      <div class="topbar-user">
+        <button id="theme-toggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">&#9681;</button>
+        <span id="me-badge" class="user-badge" title="Account"></span>
+        <button id="logout-btn" class="btn btn-ghost btn-sm">Log out</button>
+      </div>
+    </header>
+
+    <!-- Status banner (pending approval, etc.) -->
+    <div id="status-banner" class="banner" hidden></div>
+
+    <main class="content">
+
+      <!-- ---------------- CHAT ---------------- -->
+      <section class="panel" id="panel-chat" data-tab="chat" hidden>
+        <div class="chat-layout">
+          <aside class="chat-sidebar" id="chat-sidebar">
+            <div class="sidebar-head">
+              <h2>Chats</h2>
+              <button id="chat-new" class="btn btn-primary btn-sm">+ New</button>
+            </div>
+            <ul id="conversation-list" class="conv-list"></ul>
+          </aside>
+
+          <div class="chat-main">
+            <div id="chat-messages" class="chat-messages" aria-live="polite">
+              <div class="empty-hint" id="chat-empty">Start a new chat or pick one from the list.</div>
+            </div>
+            <form id="chat-form" class="chat-input-row">
+              <button type="button" id="chat-mic" class="icon-btn chat-mic" title="Record a voice message"
+                      aria-label="Record a voice message" hidden>&#127908;</button>
+              <textarea id="chat-input" rows="1" placeholder="Message the model…"
+                        autocomplete="off"></textarea>
+              <button type="submit" id="chat-send" class="btn btn-primary">Send</button>
+              <button type="button" id="chat-stop" class="btn btn-ghost" hidden>Stop</button>
+            </form>
+            <div class="chat-voice-bar" id="chat-voice-bar" hidden>
+              <label class="speak-toggle" title="Read assistant replies aloud after voice messages">
+                <input type="checkbox" id="speak-replies-toggle">
+                <span>&#128266; Speak replies</span>
+              </label>
+              <span class="voice-status" id="voice-status" aria-live="polite" hidden></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------- NOTES ---------------- -->
+      <section class="panel" id="panel-notes" data-tab="notes" hidden>
+        <div class="panel-head">
+          <h2>Notes</h2>
+          <button id="note-new" class="btn btn-primary btn-sm">+ New note</button>
+        </div>
+        <div id="notes-grid" class="notes-grid"></div>
+        <div class="empty-hint" id="notes-empty" hidden>No notes yet. Create your first one.</div>
+      </section>
+
+      <!-- ---------------- CHECKLISTS ---------------- -->
+      <section class="panel" id="panel-checklists" data-tab="checklists" hidden>
+        <div class="panel-head">
+          <h2>Checklists</h2>
+          <form id="checklist-new-form" class="inline-form">
+            <input id="checklist-new-title" type="text" placeholder="New checklist title" maxlength="120" required>
+            <button type="submit" class="btn btn-primary btn-sm">Add</button>
+          </form>
+        </div>
+        <div id="checklists-list" class="checklists-list"></div>
+        <div class="empty-hint" id="checklists-empty" hidden>No checklists yet.</div>
+      </section>
+
+      <!-- ---------------- FILES & PHOTOS ---------------- -->
+      <section class="panel" id="panel-files" data-tab="files" hidden>
+        <div class="panel-head">
+          <h2>Files &amp; Photos</h2>
+          <div class="files-filter">
+            <button class="chip chip-active" data-kind="">All</button>
+            <button class="chip" data-kind="file">Files</button>
+            <button class="chip" data-kind="photo">Photos</button>
+          </div>
+        </div>
+
+        <form id="search-form" class="search-row">
+          <input id="search-input" type="search" placeholder="Search your files & photos…" maxlength="200">
+          <button type="submit" class="btn btn-primary btn-sm">Search</button>
+          <button type="button" id="search-clear" class="btn btn-ghost btn-sm" hidden>Clear</button>
+        </form>
+        <div id="search-results" class="search-results" hidden></div>
+
+        <div id="dropzone" class="dropzone" data-priv-gate="files_write">
+          <input id="file-input" type="file" multiple hidden>
+          <p>Drag &amp; drop files here, or <button type="button" id="file-browse" class="btn-link">browse</button>.</p>
+          <label class="shared-toggle">
+            <input type="checkbox" id="upload-shared"> Share with the household
+          </label>
+        </div>
+        <div id="upload-progress" class="upload-progress" hidden></div>
+
+        <div id="files-grid" class="files-grid"></div>
+        <div class="empty-hint" id="files-empty" hidden>No files yet.</div>
+      </section>
+
+      <!-- ---------------- KEYS ---------------- -->
+      <section class="panel" id="panel-keys" data-tab="keys" hidden>
+        <div class="panel-head">
+          <h2>API Keys</h2>
+          <form id="key-new-form" class="inline-form">
+            <input id="key-new-name" type="text" placeholder="Key name (e.g. phone app)" maxlength="80" required>
+            <button type="submit" class="btn btn-primary btn-sm">Create key</button>
+          </form>
+        </div>
+        <p class="muted">
+          Use these keys in other apps to talk to the household model. The plaintext key is shown
+          <strong>only once</strong> at creation — copy it then.
+        </p>
+        <div id="keys-list" class="keys-list"></div>
+        <div class="empty-hint" id="keys-empty" hidden>No keys yet.</div>
+      </section>
+
+      <!-- ---------------- ADMIN ---------------- -->
+      <section class="panel" id="panel-admin" data-tab="admin" hidden>
+        <div class="panel-head">
+          <h2>Devices</h2>
+          <button id="admin-refresh" class="btn btn-ghost btn-sm">Refresh</button>
+        </div>
+        <p class="muted">Approve new devices and assign a role &amp; privileges. Pending devices cannot use the hub until approved.</p>
+        <div id="devices-list" class="devices-list"></div>
+        <div class="empty-hint" id="devices-empty" hidden>No devices found.</div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- Modal host (note editor, key reveal, device approval, etc.)   -->
+  <!-- ============================================================= -->
+  <div id="modal-root" class="modal-root" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <button class="modal-x" data-modal-close aria-label="Close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast host -->
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <!-- Reused hidden audio element for read-aloud / talk-loop playback -->
+  <audio id="voice-audio" hidden></audio>
+
+  <!-- Privilege list available to JS without re-fetching the contract -->
+  <template id="priv-template">
+    <label class="priv-check"><input type="checkbox" value="chat"> chat</label>
+    <label class="priv-check"><input type="checkbox" value="notes"> notes</label>
+    <label class="priv-check"><input type="checkbox" value="checklists"> checklists</label>
+    <label class="priv-check"><input type="checkbox" value="files_read"> files_read</label>
+    <label class="priv-check"><input type="checkbox" value="files_write"> files_write</label>
+    <label class="priv-check"><input type="checkbox" value="photos_read"> photos_read</label>
+    <label class="priv-check"><input type="checkbox" value="photos_write"> photos_write</label>
+    <label class="priv-check"><input type="checkbox" value="api_keys"> api_keys</label>
+  </template>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

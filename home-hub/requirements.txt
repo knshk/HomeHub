@@ -1,0 +1,14 @@
+# Home LLM Hub runtime dependencies. Pin majors to keep the appliance stable.
+# stdlib sqlite3 is used directly (NO ORM); not listed here.
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+httpx>=0.27,<1.0
+python-dotenv>=1.0,<2.0
+python-multipart>=0.0.9,<1.0
+pypdf>=4.0,<6.0
+python-docx>=1.1,<2.0
+pillow>=10.0,<12.0
+numpy>=1.26,<3.0
+# Optional LAN discovery (mDNS/Bonjour). The hub degrades gracefully if this is
+# missing or registration fails (see app/discovery.py) -- it never crashes.
+zeroconf>=0.131,<1.0

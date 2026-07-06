@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en" data-palette="cubby">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home Hub — Mobile Layout</title>
+<script>
+(function () {
+  try {
+    var p = localStorage.getItem('hh_palette') || 'cubby';
+    var m = localStorage.getItem('hh_mode') || 'light';
+    var resolved = m === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : m;
+    document.documentElement.setAttribute('data-palette', p);
+    document.documentElement.setAttribute('data-mode', resolved);
+  } catch (e) { document.documentElement.setAttribute('data-mode', 'light'); }
+})();
+</script>
+<style>
+/* ===== tokens (mirror of the app) ===== */
+:root{
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;
+  --fs-xs:.72rem;--fs-sm:.82rem;--fs-md:.94rem;--fs-lg:1.05rem;--fs-xl:1.25rem;
+  --r-sm:10px;--r-md:14px;--r-lg:18px;--r-card:20px;--r-pill:999px;
+  --shadow-sm:0 1px 2px rgba(20,24,40,.06),0 1px 3px rgba(20,24,40,.05);
+  --shadow-md:0 4px 14px rgba(20,24,40,.08),0 2px 6px rgba(20,24,40,.05);
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-head:ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif;
+}
+[data-palette="greenhouse"]{--font-head:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--r-sm:8px;--r-md:12px;--r-lg:14px;--r-card:16px;}
+[data-palette="hearth"]{--font-head:Georgia,"Iowan Old Style",serif;--r-sm:7px;--r-md:10px;--r-lg:13px;--r-card:14px;}
+[data-palette="cubby"][data-mode="light"]{--bg:#EEF0F4;--bg2:#E7EAF2;--surface:#fff;--surface2:#F5F7FB;--surface3:#EDEFF6;--text:#1E2333;--muted:#5B6378;--faint:#8A93A8;--border:#DCE0EB;--border2:#C7CDDC;--accent:#3B5BD9;--accent-ink:#fff;--accent-soft:#E3E9FC;--pop:#F2B632;--pop-soft:#FCEFCB;--danger:#D6453B;--danger-soft:#FBE2E0;--success:#2E9E6B;--success-soft:#DBF1E6;--bezel:#1b2030;}
+[data-palette="cubby"][data-mode="dark"]{--bg:#141824;--bg2:#11151F;--surface:#1E2431;--surface2:#262E3E;--surface3:#2E3850;--text:#EAEDF6;--muted:#9BA4BA;--faint:#717C95;--border:#303A4E;--border2:#3C4862;--accent:#7B92F2;--accent-ink:#0E1320;--accent-soft:#283460;--pop:#F2B632;--pop-soft:#3D341B;--danger:#F0786E;--danger-soft:#3A2220;--success:#4FC089;--success-soft:#163127;--bezel:#05070d;}
+[data-palette="greenhouse"][data-mode="light"]{--bg:#EAEFE7;--bg2:#E1E8DC;--surface:#fff;--surface2:#F4F7F1;--surface3:#E9EFE5;--text:#1E332A;--muted:#56695C;--faint:#84957F;--border:#D5DECF;--border2:#C2CEB9;--accent:#356B57;--accent-ink:#fff;--accent-soft:#DCE8DF;--pop:#E0A56B;--pop-soft:#F6E7D4;--danger:#C0533F;--danger-soft:#F4E0D9;--success:#3E8E5E;--success-soft:#DCEEE1;--bezel:#15201a;}
+[data-palette="greenhouse"][data-mode="dark"]{--bg:#14201A;--bg2:#101A15;--surface:#1C2A23;--surface2:#233129;--surface3:#2B3B31;--text:#E7EFE7;--muted:#93A799;--faint:#6E8273;--border:#2C3D33;--border2:#3A4F42;--accent:#62A786;--accent-ink:#0C1611;--accent-soft:#21382D;--pop:#E0A56B;--pop-soft:#382C1F;--danger:#E08571;--danger-soft:#36231D;--success:#5BB07E;--success-soft:#15291E;--bezel:#050907;}
+[data-palette="hearth"][data-mode="light"]{--bg:#F4EDE1;--bg2:#EFE5D5;--surface:#FFFBF4;--surface2:#F7F0E4;--surface3:#F0E6D6;--text:#2B2118;--muted:#6E6052;--faint:#9A8B79;--border:#E4D8C6;--border2:#D6C7B0;--accent:#C2673B;--accent-ink:#fff;--accent-soft:#F1DFD1;--pop:#5C7A6B;--pop-soft:#DDE7E0;--danger:#B24A3A;--danger-soft:#F2DCD6;--success:#4E7A52;--success-soft:#DEE9DD;--bezel:#241a12;}
+[data-palette="hearth"][data-mode="dark"]{--bg:#211C16;--bg2:#1A150F;--surface:#2B251D;--surface2:#342D24;--surface3:#3E3528;--text:#F1E9DC;--muted:#B3A593;--faint:#897C6A;--border:#3D352A;--border2:#4C4234;--accent:#DB8458;--accent-ink:#1A140E;--accent-soft:#3A2D22;--pop:#88A38F;--pop-soft:#2A352E;--danger:#E08571;--danger-soft:#382420;--success:#7FAA82;--success-soft:#25301F;--bezel:#0c0904;}
+
+*{box-sizing:border-box;margin:0;}
+body{font-family:var(--font-body);color:var(--text);background:radial-gradient(130% 90% at 100% 0%,var(--bg2),transparent 55%),var(--bg);min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:1280px;margin:0 auto;padding:clamp(20px,4vw,44px) clamp(16px,4vw,32px) 80px;}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:8px;}
+.brandmark{width:46px;height:46px;border-radius:14px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:0 0 auto;box-shadow:0 4px 14px rgba(20,24,40,.18);}
+.brandmark svg{width:26px;height:26px;}
+.eyebrow{font-size:.74rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);}
+h1{font-family:var(--font-head);font-size:clamp(1.7rem,1.2rem + 2.4vw,2.6rem);line-height:1.1;}
+.sub{color:var(--muted);margin:10px 0 4px;max-width:64ch;font-size:1.02rem;line-height:1.55;}
+.sub a{color:var(--accent);font-weight:600;}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 38px;}
+.seg{display:inline-flex;padding:4px;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:14px;}
+.seg button{border:none;background:transparent;padding:9px 15px;border-radius:10px;min-height:42px;font:inherit;font-weight:600;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:8px;}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);}
+.seg .sw{display:inline-flex;gap:3px;}
+.seg .sw i{width:12px;height:12px;border-radius:3px;display:block;}
+
+.gallery{display:grid;gap:clamp(30px,4vw,60px) clamp(20px,3vw,44px);grid-template-columns:repeat(auto-fit,minmax(300px,1fr));justify-items:center;align-items:start;}
+.frame{width:100%;max-width:340px;}
+.frame__label{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-left:4px;}
+.frame__label .n{width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:.8rem;flex:0 0 auto;}
+.frame__label .t{font-family:var(--font-head);font-weight:700;font-size:1.06rem;}
+.frame__label .d{color:var(--muted);font-size:.82rem;}
+
+/* phone bezel */
+.phone{position:relative;width:100%;background:var(--bezel);border-radius:46px;padding:11px;box-shadow:0 2px 4px rgba(0,0,0,.3),0 22px 50px rgba(20,24,40,.28),inset 0 0 0 2px rgba(255,255,255,.05);}
+.phone::after{content:"";position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:108px;height:5px;border-radius:99px;background:rgba(255,255,255,.5);z-index:5;}
+.screen{position:relative;border-radius:36px;overflow:hidden;background:var(--bg);height:734px;display:flex;flex-direction:column;}
+/* status bar + notch */
+.status{height:42px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:.74rem;font-weight:700;color:var(--text);position:relative;z-index:4;}
+.status .notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:96px;height:22px;background:var(--bezel);border-radius:14px;}
+.status .ic{display:inline-flex;gap:5px;align-items:center;}
+.status .ic svg{width:15px;height:15px;}
+.screen__body{flex:1;overflow:hidden;position:relative;}
+.screen__scroll{position:absolute;inset:0;overflow:hidden;}
+
+/* ===== app chrome (compact) ===== */
+.abar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:color-mix(in srgb,var(--bg) 86%,transparent);border-bottom:1px solid var(--border);}
+.abar .b{display:flex;align-items:center;gap:8px;font-family:var(--font-head);font-weight:800;font-size:.96rem;}
+.abar .b .m{width:30px;height:30px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;}
+.abar .b .m svg{width:17px;height:17px;}
+.abar .b small{display:block;font-family:var(--font-body);font-weight:500;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.abar .sp{flex:1;}
+.ibtn{width:36px;height:36px;border-radius:11px;background:var(--surface2);display:grid;place-items:center;color:var(--text);flex:0 0 auto;border:none;}
+.ibtn svg{width:18px;height:18px;}
+.ava{width:32px;height:32px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:.8rem;flex:0 0 auto;}
+.nav{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border);}
+.nav .tb{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 11px;border-radius:11px;background:transparent;color:var(--muted);font-weight:600;font-size:.76rem;border:1.5px solid transparent;}
+.nav .tb svg{width:15px;height:15px;}
+.nav .tb.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow-sm);border-color:var(--border);}
+.content{padding:14px;}
+.eh{font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);}
+.h2{font-family:var(--font-head);font-size:1.3rem;font-weight:700;margin:3px 0;}
+.psub{color:var(--muted);font-size:.8rem;}
+
+/* chat */
+.msg{display:flex;margin-bottom:12px;}
+.msg.me{justify-content:flex-end;}
+.bub{max-width:82%;padding:10px 13px;border-radius:16px;font-size:.84rem;line-height:1.45;}
+.msg.ai .bub{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:5px;}
+.msg.me .bub{background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:5px;}
+.btools{display:flex;gap:5px;margin-top:7px;}
+.btools span{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px;border-radius:7px;background:var(--surface2);color:var(--muted);font-size:.66rem;font-weight:600;}
+.btools svg{width:12px;height:12px;}
+.composer{position:absolute;left:12px;right:12px;bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow-md);padding:10px;}
+.composer .tx{color:var(--faint);font-size:.84rem;padding:4px 4px 8px;}
+.cbar{display:flex;align-items:center;gap:7px;}
+.cbar .mic{width:38px;height:38px;border-radius:11px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;}
+.cbar .mic svg{width:19px;height:19px;}
+.sw-pill{display:inline-flex;align-items:center;gap:7px;font-size:.74rem;color:var(--muted);font-weight:600;}
+.track{width:42px;height:25px;border-radius:99px;background:var(--accent);position:relative;}
+.track::after{content:"";position:absolute;top:3px;left:20px;width:19px;height:19px;border-radius:50%;background:#fff;}
+.cbar .sp{flex:1;}
+.send{width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;}
+.send svg{width:19px;height:19px;}
+
+/* notes */
+.note{padding:13px;border-radius:18px;margin-bottom:12px;position:relative;color:#2b2418;box-shadow:var(--shadow-sm);border:1px solid rgba(0,0,0,.06);}
+[data-mode="dark"] .note{box-shadow:0 2px 10px rgba(0,0,0,.35);border-color:rgba(0,0,0,.14);}
+.note h4{font-size:.9rem;margin-bottom:4px;padding-right:28px;font-family:var(--font-head);}
+.note p{font-size:.78rem;opacity:.85;line-height:1.45;}
+.note .meta{margin-top:9px;font-size:.66rem;opacity:.6;}
+.note .pin{position:absolute;top:9px;right:9px;width:28px;height:28px;border-radius:8px;background:rgba(0,0,0,.08);display:grid;place-items:center;color:inherit;}
+.note .pin.on{background:rgba(0,0,0,.18);}
+.note .pin svg{width:15px;height:15px;}
+
+/* files */
+.search{position:relative;margin-bottom:12px;}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--faint);}
+.search input{width:100%;height:44px;border-radius:13px;border:1.5px solid var(--border2);background:var(--surface);padding:0 14px 0 38px;font:inherit;font-size:.84rem;color:var(--text);}
+.dz{border:2px dashed var(--border2);border-radius:16px;padding:16px;text-align:center;color:var(--muted);background:var(--surface2);font-size:.76rem;margin-bottom:14px;}
+.dz svg{width:26px;height:26px;color:var(--accent);margin-bottom:4px;}
+.dz strong{color:var(--text);}
+.cnt{font-size:.74rem;color:var(--muted);font-weight:600;margin-bottom:9px;}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.tile{border-radius:13px;overflow:hidden;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-sm);}
+.tile .th{aspect-ratio:4/3;display:grid;place-items:center;color:#fff;position:relative;}
+.tile .th svg{width:28px;height:28px;opacity:.92;}
+.tile .th .ext{position:absolute;bottom:6px;left:6px;font-size:9px;font-weight:800;background:rgba(0,0,0,.28);color:#fff;padding:1px 6px;border-radius:5px;}
+.tile .mt{padding:7px 9px;}
+.tile .mt .nm{font-size:.74rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tile .mt .sz{font-size:.66rem;color:var(--muted);}
+
+/* admin */
+.dev{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:10px;}
+.dev .di{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;}
+.dev .di svg{width:19px;height:19px;}
+.dev .dm{flex:1;min-width:0;}
+.dev .dm .nm{font-weight:700;font-size:.86rem;}
+.dev .dm .ds{font-size:.7rem;color:var(--muted);}
+.chip{display:inline-flex;align-items:center;height:25px;padding:0 10px;border-radius:99px;font-size:.66rem;font-weight:700;background:var(--surface3);color:var(--muted);}
+.chip.warn{background:var(--danger-soft);color:var(--danger);}
+.chip.acc{background:var(--accent-soft);color:var(--accent);}
+.minib{height:34px;padding:0 13px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:.76rem;display:inline-flex;align-items:center;border:none;}
+.divh{height:1px;background:var(--border);margin:14px 0;}
+
+/* modal (over a dimmed admin) */
+.dim{position:absolute;inset:0;background:rgba(15,18,30,.5);z-index:8;}
+.sheet{position:absolute;left:10px;right:10px;bottom:10px;z-index:9;background:var(--surface);border:1px solid var(--border);border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.4);padding:16px;max-height:90%;overflow:auto;}
+.sheet .sh{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;}
+.sheet .sh .av{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;flex:0 0 auto;}
+.sheet h3{font-family:var(--font-head);font-size:1.05rem;}
+.sheet .sh .x{margin-left:auto;width:34px;height:34px;border-radius:10px;background:var(--surface2);display:grid;place-items:center;color:var(--text);}
+.sheet .x svg{width:18px;height:18px;}
+.lbl{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:10px 0 6px;}
+.selbox{height:46px;border-radius:13px;border:1.5px solid var(--border2);background:var(--surface);display:flex;align-items:center;padding:0 14px;font-size:.82rem;position:relative;}
+.selbox::after{content:"";position:absolute;right:15px;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px;}
+.priv{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1.5px solid var(--border);border-radius:12px;font-size:.74rem;font-weight:600;}
+.priv.on{border-color:var(--accent);background:var(--accent-soft);}
+.cbx{width:21px;height:21px;border-radius:6px;border:2px solid var(--border2);display:grid;place-items:center;flex:0 0 auto;}
+.cbx.on{background:var(--accent);border-color:var(--accent);}
+.cbx svg{width:13px;height:13px;color:var(--accent-ink);}
+.sfoot{display:flex;gap:9px;justify-content:flex-end;margin-top:14px;}
+.gbtn{height:42px;padding:0 16px;border-radius:13px;font-weight:600;font-size:.8rem;display:inline-flex;align-items:center;border:1.5px solid var(--border2);background:transparent;color:var(--text);}
+.gbtn.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
+
+/* gate */
+.gate{height:100%;display:grid;place-items:center;padding:22px;}
+.gcard{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow-md);padding:24px 18px;}
+.glogo{width:58px;height:58px;border-radius:18px;margin:0 auto 14px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:var(--shadow-md);}
+.glogo svg{width:30px;height:30px;}
+.gcard h3{font-family:var(--font-head);font-size:1.3rem;text-align:center;}
+.gcard .gs{text-align:center;color:var(--muted);font-size:.8rem;margin:7px 0 16px;line-height:1.45;}
+.avrow{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:16px;}
+.avp{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;}
+.avp.sel{box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--accent);}
+.gfield{height:48px;border-radius:13px;border:1.5px solid var(--border2);background:var(--surface);display:flex;align-items:center;padding:0 14px;color:var(--text);font-size:.86rem;}
+.gbig{height:50px;border-radius:15px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;margin-top:14px;font-size:.94rem;}
+.gbig svg{width:18px;height:18px;}
+.gadm{text-align:center;margin-top:14px;color:var(--muted);font-size:.78rem;font-weight:600;text-decoration:underline;text-underline-offset:3px;}
+
+.legend{margin-top:56px;padding:22px 24px;background:var(--surface);border:1px solid var(--border);border-radius:20px;}
+.legend h2{font-family:var(--font-head);font-size:1.15rem;margin-bottom:6px;}
+.legend p{color:var(--muted);font-size:.94rem;line-height:1.6;}
+.legend a{color:var(--accent);font-weight:600;}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <span class="brandmark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+    <div>
+      <span class="eyebrow">Home Hub · Mobile</span>
+      <h1>The phone layout</h1>
+    </div>
+  </header>
+  <p class="sub">Every section drawn at phone width — single column, thumb-friendly, 44px+ targets, nothing scrolls sideways. Switch palette &amp; appearance to preview how the household options feel on a phone. The full responsive build lives in <a href="Home Hub.html">Home Hub.html</a>.</p>
+
+  <div class="controls" role="group" aria-label="Preview theme">
+    <div class="seg" id="paletteSeg">
+      <button data-palette="cubby" aria-pressed="true"><span class="sw"><i style="background:#3B5BD9"></i><i style="background:#F2B632"></i></span>Cubby</button>
+      <button data-palette="greenhouse" aria-pressed="false"><span class="sw"><i style="background:#356B57"></i><i style="background:#E0A56B"></i></span>Greenhouse</button>
+      <button data-palette="hearth" aria-pressed="false"><span class="sw"><i style="background:#C2673B"></i><i style="background:#5C7A6B"></i></span>Hearth</button>
+    </div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="light" aria-pressed="true">Light</button>
+      <button data-mode="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+
+  <div class="gallery">
+
+    <!-- 01 GATE -->
+    <div class="frame">
+      <div class="frame__label"><span class="n">01</span><div><div class="t">Login gate</div><div class="d">Pick a name · tap Enter</div></div></div>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h20V2z" opacity=".9"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="18" height="10" rx="2"/><rect x="21" y="10" width="1.5" height="4"/></svg></span></div>
+        <div class="screen__body"><div class="gate">
+          <div class="gcard">
+            <div class="glogo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></div>
+            <h3>Hi, who&rsquo;s home?</h3>
+            <p class="gs">Pick a name and tap Enter. No passwords &mdash; this hub only lives on your home WiFi.</p>
+            <div class="avrow">
+              <span class="avp sel" style="background:#3B5BD9">M</span><span class="avp" style="background:#E0843A"></span><span class="avp" style="background:#2E9E6B"></span><span class="avp" style="background:#C2673B"></span><span class="avp" style="background:#8C56D9"></span><span class="avp" style="background:#1FA2B8"></span>
+            </div>
+            <div class="gfield">Maya</div>
+            <div class="gbig">Enter the Hub <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></div>
+            <div class="gadm">I&rsquo;m the admin</div>
+          </div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 02 CHAT -->
+    <div class="frame">
+      <div class="frame__label"><span class="n">02</span><div><div class="t">Chat</div><div class="d">Mic · read-aloud · speak toggle</div></div></div>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="18" height="10" rx="2"/></svg></span></div>
+        <div class="screen__body">
+          <div class="abar"><span class="b"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span><span>Home Hub<small>on your WiFi</small></span></span><span class="sp"></span><button class="ibtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M2 12h2M20 12h2"/></svg></button><span class="ava" style="background:#3B5BD9">M</span></div>
+          <div class="nav"><span class="tb on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</span><span class="tb">Notes</span><span class="tb">Checklists</span><span class="tb">Files</span><span class="tb">Keys</span></div>
+          <div class="content" style="padding-bottom:0">
+            <span class="eh">Family assistant</span><div class="h2">Hi Maya — ask me anything</div>
+            <div style="margin-top:14px">
+              <div class="msg ai"><div class="bub">Hi! I&rsquo;m your home assistant. I live on this network — ask me about dinner, homework, the calendar, anything. 🏡<div class="btools"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>Read aloud</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Copy</span></div></div></div>
+              <div class="msg me"><div class="bub">What&rsquo;s an easy dinner with what we&rsquo;ve got?</div></div>
+              <div class="msg ai"><div class="bub">Roast the veggies at 220&deg;C for ~25 min, toss with olive oil &amp; lemon. Want a shopping list?</div></div>
+            </div>
+          </div>
+          <div class="composer">
+            <div class="tx">Type a message… or tap the mic</div>
+            <div class="cbar">
+              <span class="mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+              <span class="sw-pill"><span class="track"></span>Speak replies</span>
+              <span class="sp"></span>
+              <span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 03 NOTES -->
+    <div class="frame">
+      <div class="frame__label"><span class="n">03</span><div><div class="t">Notes</div><div class="d">Colored, pinnable cards</div></div></div>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="18" height="10" rx="2"/></svg></span></div>
+        <div class="screen__body"><div class="screen__scroll">
+          <div class="abar"><span class="b"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span><span>Home Hub<small>on your WiFi</small></span></span><span class="sp"></span><span class="ava" style="background:#3B5BD9">M</span></div>
+          <div class="nav"><span class="tb">Chat</span><span class="tb on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12l-5 5H4z"/><path d="M15 21v-5h5"/></svg>Notes</span><span class="tb">Checklists</span><span class="tb">Files</span></div>
+          <div class="content">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div><span class="eh">Shared noticeboard</span><div class="h2">Notes</div></div><span class="minib"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></div>
+            <div class="note" style="background:#CFE0FB"><span class="pin on"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3z"/></svg></span><h4>WiFi password</h4><p>It&rsquo;s on the fridge magnet 🧲 — ask a grown-up if you can&rsquo;t find it.</p><div class="meta">Dad · just now</div></div>
+            <div class="note" style="background:#FDE8B5"><span class="pin on"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3z"/></svg></span><h4>Saturday plan</h4><p>Soccer at 10, library after, pizza night! 🍕</p><div class="meta">Mom · just now</div></div>
+            <div class="note" style="background:#CFE9D6"><span class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3z"/></svg></span><h4>Grocery ideas</h4><p>Pasta, tomatoes, the good bread, oat milk, apples for lunches.</p><div class="meta">Maya · just now</div></div>
+            <div class="note" style="background:#E7D7F4"><span class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3z"/></svg></span><h4>Bedtime story queue</h4><p>Finish the dragon book, then the lighthouse one.</p><div class="meta">Dad · just now</div></div>
+          </div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 04 FILES -->
+    <div class="frame">
+      <div class="frame__label"><span class="n">04</span><div><div class="t">Files &amp; Photos</div><div class="d">Drag-drop · search · thumbnails</div></div></div>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="18" height="10" rx="2"/></svg></span></div>
+        <div class="screen__body"><div class="screen__scroll">
+          <div class="abar"><span class="b"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span><span>Home Hub<small>on your WiFi</small></span></span><span class="sp"></span><span class="ava" style="background:#3B5BD9">M</span></div>
+          <div class="nav"><span class="tb">Chat</span><span class="tb">Notes</span><span class="tb on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>Files</span><span class="tb">Keys</span></div>
+          <div class="content">
+            <span class="eh">Household library</span><div class="h2">Files &amp; Photos</div>
+            <div class="search" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input value="jpg" readonly></div>
+            <div class="cnt">3 results for &ldquo;jpg&rdquo;</div>
+            <div class="tiles">
+              <div class="tile"><div class="th" style="background:#3B5BD9"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="m21 16-5-5L5 19"/></svg><span class="ext">JPG</span></div><div class="mt"><div class="nm">Beach day.jpg</div><div class="sz">3.2 MB</div></div></div>
+              <div class="tile"><div class="th" style="background:#2E9E6B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="m21 16-5-5L5 19"/></svg><span class="ext">JPG</span></div><div class="mt"><div class="nm">Sunset hike.jpg</div><div class="sz">4.1 MB</div></div></div>
+              <div class="tile"><div class="th" style="background:#C2673B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="m21 16-5-5L5 19"/></svg><span class="ext">JPG</span></div><div class="mt"><div class="nm">Puppy first day.jpg</div><div class="sz">2.8 MB</div></div></div>
+              <div class="tile"><div class="th" style="background:#8C56D9"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span class="ext">PDF</span></div><div class="mt"><div class="nm">Recipe book.pdf</div><div class="sz">1.1 MB</div></div></div>
+            </div>
+          </div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 05 ADMIN + MODAL -->
+    <div class="frame">
+      <div class="frame__label"><span class="n">05</span><div><div class="t">Admin · Access</div><div class="d">Role + privileges sheet</div></div></div>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="18" height="10" rx="2"/></svg></span></div>
+        <div class="screen__body">
+          <div class="abar"><span class="b"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span><span>Home Hub<small>on your WiFi</small></span></span><span class="sp"></span><span class="ava" style="background:#3B5BD9">M</span></div>
+          <div class="nav"><span class="tb">Files</span><span class="tb">Keys</span><span class="tb on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 7.6 8 9 4.6-1.4 8-4.5 8-9V6z"/></svg>Admin</span></div>
+          <div class="content">
+            <span class="eh">Household admin</span><div class="h2">People &amp; Devices</div>
+            <div class="lbl" style="margin-top:8px">Waiting for approval</div>
+            <div class="dev"><span class="di" style="background:#8C56D91f;color:#8C56D9"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/></svg></span><div class="dm"><div class="nm">Avery</div><div class="ds">iPad · wants to join</div></div><button class="minib">Review</button></div>
+          </div>
+          <!-- access sheet -->
+          <div class="dim"></div>
+          <div class="sheet">
+            <div class="sh"><span class="av" style="background:#8C56D9">A</span><div><h3>Access for Avery</h3><div class="ds" style="font-size:.72rem;color:var(--muted)">iPad · wants to join</div></div><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+            <span class="lbl">Role</span>
+            <div class="selbox">Member — everyday family access</div>
+            <span class="lbl">What can they do?</span>
+            <div class="pgrid">
+              <div class="priv on"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>Use Chat</div>
+              <div class="priv on"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>Voice &amp; read</div>
+              <div class="priv on"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>Create notes</div>
+              <div class="priv on"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>Edit checklists</div>
+              <div class="priv on"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>View files</div>
+              <div class="priv"><span class="cbx"></span>Upload files</div>
+              <div class="priv"><span class="cbx"></span>Generate keys</div>
+              <div class="priv"><span class="cbx"></span>Admin powers</div>
+            </div>
+            <div class="sfoot"><span class="gbtn">Deny</span><span class="gbtn pri">Save access</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 06 SETTINGS -->
+    <div class="frame">
+      <div class="frame__label"><span class="n">06</span><div><div class="t">Settings · Themes</div><div class="d">3 looks + light/dark</div></div></div>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span class="notch"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="18" height="10" rx="2"/></svg></span></div>
+        <div class="screen__body">
+          <div class="abar"><span class="b"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span><span>Home Hub<small>on your WiFi</small></span></span><span class="sp"></span><span class="ava" style="background:#3B5BD9">M</span></div>
+          <div class="dim"></div>
+          <div class="sheet" style="bottom:auto;top:54px">
+            <div class="sh"><div><h3>Make it yours</h3><div class="ds" style="font-size:.72rem;color:var(--muted)">Pick a look for the whole hub.</div></div><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+            <span class="lbl">Theme</span>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+              <div style="border:1.5px solid var(--accent);border-radius:12px;padding:9px;box-shadow:0 0 0 3px var(--accent-soft)"><div style="display:flex;gap:3px;margin-bottom:6px"><i style="width:15px;height:15px;border-radius:5px;background:#EEF0F4;display:block"></i><i style="width:15px;height:15px;border-radius:5px;background:#3B5BD9;display:block"></i><i style="width:15px;height:15px;border-radius:5px;background:#F2B632;display:block"></i></div><div style="font-weight:700;font-size:.74rem">Cubby</div></div>
+              <div style="border:1.5px solid var(--border);border-radius:12px;padding:9px"><div style="display:flex;gap:3px;margin-bottom:6px"><i style="width:15px;height:15px;border-radius:5px;background:#EAEFE7;display:block"></i><i style="width:15px;height:15px;border-radius:5px;background:#356B57;display:block"></i><i style="width:15px;height:15px;border-radius:5px;background:#E0A56B;display:block"></i></div><div style="font-weight:700;font-size:.74rem">Greenhouse</div></div>
+              <div style="border:1.5px solid var(--border);border-radius:12px;padding:9px"><div style="display:flex;gap:3px;margin-bottom:6px"><i style="width:15px;height:15px;border-radius:5px;background:#F4EDE1;display:block"></i><i style="width:15px;height:15px;border-radius:5px;background:#C2673B;display:block"></i><i style="width:15px;height:15px;border-radius:5px;background:#5C7A6B;display:block"></i></div><div style="font-weight:700;font-size:.74rem">Hearth</div></div>
+            </div>
+            <span class="lbl">Appearance</span>
+            <div class="seg" style="background:var(--surface2)"><button aria-pressed="true" style="background:var(--surface);color:var(--accent);box-shadow:var(--shadow-sm)">Auto</button><button style="color:var(--muted)">Light</button><button style="color:var(--muted)">Dark</button></div>
+            <div class="sfoot"><span class="gbtn pri">Done</span></div>
+          </div>
+          <div class="content" style="opacity:.4">
+            <span class="eh">Family assistant</span><div class="h2">Hi Maya — ask me anything</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div class="legend">
+    <h2>About this view</h2>
+    <p>A static spec of the phone layouts, faithful to the live build. The real app — <a href="Home Hub.html">Home Hub.html</a> — is one responsive file that flows from ~320px phones up to desktop; these frames just freeze the key mobile states. Toggle palette &amp; light/dark above to preview each household theme.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const root = document.documentElement;
+function sync(){
+  document.querySelectorAll("#paletteSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.palette===root.getAttribute("data-palette")));
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.mode===root.getAttribute("data-mode")));
+}
+document.querySelectorAll("#paletteSeg button").forEach(b=>b.addEventListener("click",()=>{root.setAttribute("data-palette",b.dataset.palette);localStorage.setItem("hh_palette",b.dataset.palette);sync();}));
+document.querySelectorAll("#modeSeg button").forEach(b=>b.addEventListener("click",()=>{root.setAttribute("data-mode",b.dataset.mode);localStorage.setItem("hh_mode",b.dataset.mode);sync();}));
+// gallery defaults to a resolved mode for clarity
+if(!localStorage.getItem("hh_mode")||localStorage.getItem("hh_mode")==="system"){root.setAttribute("data-mode","light");}
+sync();
+</script>
+</body>
+</html>

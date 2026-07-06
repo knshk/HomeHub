@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# =============================================================================
+# homehub-launch - the runtime launcher for the FREE Home Hub (Type A: BYO-LLM).
+#
+# This is the single entrypoint the autostart services (systemd --user on Linux,
+# launchd LaunchAgent on macOS) exec. It:
+#
+#   1. Starts the qwen-stack GATEWAY (the lightweight auth/proxy) on its port.
+#   2. Starts the Home Hub (FastAPI/uvicorn UI) on HUB_PORT.
+#   3. (Type A / FREE) does NOT start Ollama and does NOT download any model.
+#      The user connects their OWN LLM later (local Ollama, or a cloud key).
+#   4. Optionally opens the default browser at http://localhost:$HUB_PORT
+#      (only on a non-service, interactive launch -- pass --open).
+#
+# Layout produced by install.sh (everything lives under INSTALL_DIR):
+#
+#   $INSTALL_DIR/
+#     home-hub/        <- hub source + its own .venv + .env  (UI)
+#     qwen-stack/      <- gateway source + its own .venv + .env  (auth/proxy)
+#     logs/            <- gateway.log, hub.log
+#
+# Each component has its OWN venv and OWN .env (we reuse the projects' layout).
+# This launcher reads HUB_HOST/HUB_PORT and GATEWAY_HOST/GATEWAY_PORT from those
+# .env files. It is foreground-safe: with --foreground it execs the hub uvicorn
+# in the foreground (so a service supervisor can track it) after backgrounding
+# the gateway; without it, it backgrounds both and returns.
+#
+# Usage:
+#   homehub-launch [--foreground] [--open] [--no-gateway]
+#
+#   --foreground   exec the hub uvicorn in the foreground (used by services).
+#   --open         open the default browser at the hub URL after start.
+#   --no-gateway   do not start the gateway (BYO external gateway / debugging).
+#
+# Env:
+#   HOMEHUB_DIR    install root (default: $HOME/.local/share/homehub).
+# =============================================================================
+set -euo pipefail
+
+INSTALL_DIR="${HOMEHUB_DIR:-$HOME/.local/share/homehub}"
+HUB_DIR="${INSTALL_DIR}/home-hub"
+GW_DIR="${INSTALL_DIR}/qwen-stack"
+LOG_DIR="${INSTALL_DIR}/logs"
+
+FOREGROUND=0
+OPEN_BROWSER=0
+START_GATEWAY=1
+for arg in "$@"; do
+    case "$arg" in
+        --foreground) FOREGROUND=1 ;;
+        --open)       OPEN_BROWSER=1 ;;
+        --no-gateway) START_GATEWAY=0 ;;
+        *) echo "homehub-launch: unknown arg '$arg'" >&2; exit 2 ;;
+    esac
+done
+
+mkdir -p "${LOG_DIR}"
+
+# --- tiny .env reader: echo the value of KEY from FILE, or empty -------------
+read_env() {  # read_env FILE KEY
+    local file="$1" key="$2"
+    [ -f "$file" ] || return 0
+    # last non-comment assignment wins; strip surrounding quotes.
+    grep -E "^${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2- \
+        | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//"
+}
+
+HUB_HOST="$(read_env "${HUB_DIR}/.env" HUB_HOST)";  HUB_HOST="${HUB_HOST:-0.0.0.0}"
+HUB_PORT="$(read_env "${HUB_DIR}/.env" HUB_PORT)";  HUB_PORT="${HUB_PORT:-8090}"
+GW_HOST="$(read_env "${GW_DIR}/.env" GATEWAY_HOST)"; GW_HOST="${GW_HOST:-127.0.0.1}"
+GW_PORT="$(read_env "${GW_DIR}/.env" GATEWAY_PORT)"; GW_PORT="${GW_PORT:-8080}"
+
+# --- 1) Gateway (auth/proxy) -------------------------------------------------
+# Started in the background; idempotent (skip if its port already answers).
+start_gateway() {
+    [ "${START_GATEWAY}" -eq 1 ] || { echo "launch: --no-gateway, skipping gateway"; return 0; }
+    if [ ! -x "${GW_DIR}/.venv/bin/uvicorn" ]; then
+        echo "launch: WARN gateway venv missing at ${GW_DIR}/.venv (skipping gateway)" >&2
+        return 0
+    fi
+    if curl -sf -m3 "http://127.0.0.1:${GW_PORT}/healthz" >/dev/null 2>&1; then
+        echo "launch: gateway already up on :${GW_PORT}"
+        return 0
+    fi
+    echo "launch: starting gateway on ${GW_HOST}:${GW_PORT} (log: ${LOG_DIR}/gateway.log)"
+    # setsid so it fully detaches from this launcher; survives if we exec the hub.
+    ( cd "${GW_DIR}" && setsid nohup "${GW_DIR}/.venv/bin/uvicorn" app.main:app \
+        --host "${GW_HOST}" --port "${GW_PORT}" \
+        </dev/null >>"${LOG_DIR}/gateway.log" 2>&1 & ) || true
+}
+
+# --- 3) Browser open (interactive only) -------------------------------------
+open_browser() {
+    [ "${OPEN_BROWSER}" -eq 1 ] || return 0
+    local url="http://localhost:${HUB_PORT}"
+    # Defer slightly so the hub is listening; do it in a detached subshell so it
+    # never blocks the service.
+    (
+        for _ in $(seq 1 30); do
+            curl -sf -m1 "http://127.0.0.1:${HUB_PORT}/" >/dev/null 2>&1 && break
+            sleep 0.5
+        done
+        if command -v xdg-open >/dev/null 2>&1; then xdg-open "$url" >/dev/null 2>&1 || true
+        elif command -v open  >/dev/null 2>&1; then open "$url"     >/dev/null 2>&1 || true
+        fi
+    ) &
+}
+
+# --- 2) Hub (UI) -------------------------------------------------------------
+if [ ! -x "${HUB_DIR}/.venv/bin/uvicorn" ]; then
+    echo "launch: ERROR hub venv missing at ${HUB_DIR}/.venv. Run install.sh." >&2
+    exit 1
+fi
+
+start_gateway
+open_browser
+
+cd "${HUB_DIR}"
+if [ "${FOREGROUND}" -eq 1 ]; then
+    echo "launch: exec hub (foreground) on ${HUB_HOST}:${HUB_PORT}"
+    # exec so the service supervisor tracks THIS pid as the unit's main process.
+    exec "${HUB_DIR}/.venv/bin/uvicorn" app.main:app \
+        --host "${HUB_HOST}" --port "${HUB_PORT}"
+else
+    echo "launch: starting hub (background) on ${HUB_HOST}:${HUB_PORT} (log: ${LOG_DIR}/hub.log)"
+    ( cd "${HUB_DIR}" && setsid nohup "${HUB_DIR}/.venv/bin/uvicorn" app.main:app \
+        --host "${HUB_HOST}" --port "${HUB_PORT}" \
+        </dev/null >>"${LOG_DIR}/hub.log" 2>&1 & ) || true
+    echo "launch: hub started. Open http://localhost:${HUB_PORT}"
+fi

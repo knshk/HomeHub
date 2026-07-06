@@ -1,0 +1,57 @@
+# =============================================================================
+# qwen-gateway.service - systemd unit for the qwen-stack API gateway.
+#
+# Runs the FastAPI app via the project's venv uvicorn, as the non-root user
+# "kanishka", after Ollama is up. Config is read from the project .env file.
+#
+# INSTALL (do not start anything yourself):
+#
+#   sudo install -D -m 0644 \
+#       deploy/qwen-gateway.service \
+#       /etc/systemd/system/qwen-gateway.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now qwen-gateway.service     # when ready to run
+#
+#   sudo systemctl status qwen-gateway.service
+#   journalctl -u qwen-gateway.service -f
+#
+# Prerequisites:
+#   - ./install.sh has been run (venv + deps + sqlite schema exist)
+#   - /home/kanishka/kk_works/LLMs/qwen-stack/.env exists and is chmod 600
+# =============================================================================
+[Unit]
+Description=qwen-stack API gateway (FastAPI/uvicorn in front of Ollama)
+Documentation=file:///home/kanishka/kk_works/LLMs/qwen-stack
+# Start after Ollama so the upstream is available; Wants keeps it non-fatal
+# if Ollama is managed separately.
+After=network-online.target ollama.service
+Wants=network-online.target ollama.service
+
+[Service]
+Type=simple
+User=kanishka
+Group=kanishka
+
+WorkingDirectory=/home/kanishka/kk_works/LLMs/qwen-stack
+EnvironmentFile=/home/kanishka/kk_works/LLMs/qwen-stack/.env
+
+# Use the venv uvicorn directly. Host/port mirror the contract; the app also
+# reads GATEWAY_HOST/GATEWAY_PORT from the EnvironmentFile if your entrypoint
+# honors them, but the explicit flags guarantee the documented bind.
+ExecStart=/home/kanishka/kk_works/LLMs/qwen-stack/.venv/bin/uvicorn \
+    app.main:app --host 0.0.0.0 --port 8080
+
+Restart=on-failure
+RestartSec=3
+
+# --- Hardening (best-effort; relax if your app needs more) -------------------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectControlGroups=true
+ProtectKernelTunables=true
+# Allow writes only to the project data dir (sqlite db) and standard runtime.
+ReadWritePaths=/home/kanishka/kk_works/LLMs/qwen-stack/data
+
+[Install]
+WantedBy=multi-user.target

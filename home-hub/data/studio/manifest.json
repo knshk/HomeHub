@@ -1,0 +1,72 @@
+{
+  "a4727c04-4b6d-4437-9968-579bb2098c8a-1": {
+    "id": "a4727c04-4b6d-4437-9968-579bb2098c8a-1",
+    "name": "a4727c04-4b6d-4437-9968-579bb2098c8a-1",
+    "catalogId": "",
+    "source": "images/a4727c04-4b6d-4437-9968-579bb2098c8a-1.png",
+    "animation": null,
+    "animationType": null,
+    "status": "draft",
+    "games": [],
+    "notes": "",
+    "origin": "/home/kanishka/kk_works/fastsdcpu/results/a4727c04-4b6d-4437-9968-579bb2098c8a-1.png",
+    "created": "2026-07-04T10:35:04.471274+00:00",
+    "updated": "2026-07-04T10:35:04.471283+00:00"
+  },
+  "c7333d61-2849-4670-9db6-6ebb2573b65e-1": {
+    "id": "c7333d61-2849-4670-9db6-6ebb2573b65e-1",
+    "name": "c7333d61-2849-4670-9db6-6ebb2573b65e-1",
+    "catalogId": "",
+    "source": "images/c7333d61-2849-4670-9db6-6ebb2573b65e-1.png",
+    "animation": null,
+    "animationType": null,
+    "status": "draft",
+    "games": [],
+    "notes": "",
+    "origin": "/home/kanishka/kk_works/fastsdcpu/results/c7333d61-2849-4670-9db6-6ebb2573b65e-1.png",
+    "created": "2026-07-04T10:35:04.472974+00:00",
+    "updated": "2026-07-04T10:35:04.472982+00:00"
+  },
+  "978feefe-0894-4e08-892e-f5e430a1b8f9-1": {
+    "id": "978feefe-0894-4e08-892e-f5e430a1b8f9-1",
+    "name": "978feefe-0894-4e08-892e-f5e430a1b8f9-1",
+    "catalogId": "",
+    "source": "images/978feefe-0894-4e08-892e-f5e430a1b8f9-1.png",
+    "animation": null,
+    "animationType": null,
+    "status": "draft",
+    "games": [],
+    "notes": "",
+    "origin": "/home/kanishka/kk_works/fastsdcpu/results/978feefe-0894-4e08-892e-f5e430a1b8f9-1.png",
+    "created": "2026-07-04T10:38:46.287547+00:00",
+    "updated": "2026-07-04T10:42:26.487087+00:00"
+  },
+  "42dafe189b384831968fcaa3deb33f47-1": {
+    "id": "42dafe189b384831968fcaa3deb33f47-1",
+    "name": "42dafe189b384831968fcaa3deb33f47-1",
+    "catalogId": "",
+    "source": "images/42dafe189b384831968fcaa3deb33f47-1.png",
+    "animation": null,
+    "animationType": null,
+    "status": "draft",
+    "games": [],
+    "notes": "",
+    "origin": "/home/kanishka/kk_works/fastsdcpu/results/42dafe189b384831968fcaa3deb33f47-1.png",
+    "created": "2026-07-04T19:47:53.428586+00:00",
+    "updated": "2026-07-04T19:47:53.428591+00:00"
+  },
+  "_flux_gguf_test": {
+    "id": "_flux_gguf_test",
+    "name": "_flux_gguf_test",
+    "catalogId": "",
+    "source": "images/_flux_gguf_test.png",
+    "animation": null,
+    "animationType": null,
+    "status": "draft",
+    "games": [],
+    "notes": "",
+    "origin": "/home/kanishka/kk_works/fastsdcpu/results/_flux_gguf_test.png",
+    "created": "2026-07-04T19:47:53.430465+00:00",
+    "updated": "2026-07-04T19:47:53.430470+00:00"
+  }
+}

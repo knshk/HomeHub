@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en" data-palette="cubby" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#3B5BD9">
+  <title>Home Hub</title>
+  <!-- Apply saved theme (palette + appearance) before first paint, no flash. -->
+  <script>
+    (function () {
+      try {
+        var p = localStorage.getItem('hub-palette') || 'cubby';
+        var m = localStorage.getItem('hub-mode') || 'system';
+        var eff = m === 'system'
+          ? (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : m;
+        var r = document.documentElement;
+        r.setAttribute('data-palette', p);
+        r.setAttribute('data-theme', eff);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127968;</text></svg>">
+</head>
+<body>
+
+  <!-- ============================================================= -->
+  <!-- First-visit / unauthenticated gate                            -->
+  <!-- ============================================================= -->
+  <div id="gate" class="gate" hidden>
+    <div class="gate-card">
+      <div class="gate-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg>
+      </div>
+      <h1>Home Hub</h1>
+      <p class="gate-sub">Your family's private AI portal &mdash; it only lives on your home WiFi.</p>
+
+      <!-- ===================================================== -->
+      <!-- Find your Home Hub (connection panel, above username) -->
+      <!-- ===================================================== -->
+      <section id="gate-connect" class="gate-connect" aria-label="Find your Home Hub">
+        <!-- Connected state: current origin is a Home Hub -->
+        <div id="gate-connected" class="connect-status connect-ok" hidden>
+          <span class="connect-dot" aria-hidden="true"></span>
+          <span class="connect-text">Connected to <strong id="gate-hub-name">this hub</strong></span>
+        </div>
+
+        <!-- Not-a-hub / searching state: offer find + manual entry -->
+        <div id="gate-finder" class="connect-finder" hidden>
+          <p class="connect-lead" id="gate-finder-lead">
+            Connect to your family's Home Hub to continue.
+          </p>
+
+          <button id="gate-find-btn" type="button" class="btn btn-ghost btn-block">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            Find Home Hub
+          </button>
+
+          <ul id="gate-hub-list" class="hub-list" hidden></ul>
+
+          <details id="gate-manual" class="connect-manual">
+            <summary>Enter hub address</summary>
+            <form id="gate-manual-form" class="connect-manual-form" autocomplete="off">
+              <label class="field-label" for="gate-manual-input">Hub address</label>
+              <input id="gate-manual-input" class="field" type="text" inputmode="url"
+                     autocapitalize="none" autocomplete="off"
+                     placeholder="homehub.local:8090 or http://192.168.1.20:8090">
+              <button id="gate-manual-btn" type="submit" class="btn btn-primary btn-block">Connect</button>
+            </form>
+          </details>
+
+          <p id="gate-connect-msg" class="connect-msg" role="status" aria-live="polite" hidden></p>
+        </div>
+      </section>
+
+      <!-- Register (default) -->
+      <form id="gate-register-form" class="gate-form" autocomplete="off">
+        <label class="field-label" for="gate-username">Pick a username</label>
+        <input id="gate-username" class="field" name="username" type="text" inputmode="text"
+               autocapitalize="none" autocomplete="username" placeholder="e.g. alex"
+               maxlength="40" required>
+        <button type="submit" class="btn btn-primary btn-lg btn-block">
+          Enter the Hub
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+        </button>
+        <p class="gate-hint">
+          New devices start as a <strong>pending guest</strong> until an admin approves them.
+        </p>
+      </form>
+
+      <button id="gate-show-admin" type="button" class="btn-link gate-admin-toggle">
+        I'm the admin
+      </button>
+
+      <!-- Admin claim (hidden until toggled) -->
+      <form id="gate-admin-form" class="gate-form" autocomplete="off" hidden>
+        <label class="field-label" for="gate-admin-username">Username</label>
+        <input id="gate-admin-username" class="field" name="username" type="text"
+               autocapitalize="none" autocomplete="username" placeholder="admin name"
+               maxlength="40" required>
+        <label class="field-label" for="gate-admin-token">Admin token</label>
+        <input id="gate-admin-token" class="field" name="admin_token" type="password"
+               autocomplete="off" placeholder="admin or bootstrap token" required>
+        <button type="submit" class="btn btn-primary btn-block">Claim admin</button>
+        <button id="gate-hide-admin" type="button" class="btn-link">Back</button>
+      </form>
+
+      <p id="gate-error" class="form-error" role="alert" hidden></p>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- Main app shell (shown once registered)                        -->
+  <!-- ============================================================= -->
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg>
+          </span>
+          <span class="brand-name">Home Hub<small>on your WiFi</small></span>
+        </div>
+
+        <div class="topbar-spacer"></div>
+
+        <div class="topbar-user">
+          <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <span id="me-badge" class="user-badge" title="Account"></span>
+          <button id="logout-btn" class="btn btn-ghost btn-sm">Log out</button>
+        </div>
+      </div>
+
+      <nav class="navwrap" aria-label="Sections">
+        <div class="tabs" id="tabs" role="tablist">
+          <button class="tab" data-tab="chat" data-priv="chat" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+          </button>
+          <button class="tab" data-tab="images" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            <span>Images</span>
+          </button>
+          <button class="tab" data-tab="studio" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
+            <span>Studio</span>
+          </button>
+          <button class="tab" data-tab="notes" data-priv="notes" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12l-5 5H4z"/><path d="M15 21v-5h5"/></svg>
+            <span>Notes</span>
+          </button>
+          <button class="tab" data-tab="checklists" data-priv="checklists" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 7 2 2 3-3"/><path d="m4 17 2 2 3-3"/><path d="M13 6h7M13 18h7M13 12h7"/></svg>
+            <span>Checklists</span>
+          </button>
+          <button class="tab" data-tab="files" data-priv="files_read" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+            <span>Files &amp; Photos</span>
+          </button>
+          <button class="tab" data-tab="keys" data-priv="api_keys" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 6l2 2M14 8l2 2"/></svg>
+            <span>Keys</span>
+          </button>
+          <button class="tab" data-tab="admin" data-role="admin" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 7.6 8 9 4.6-1.4 8-4.5 8-9V6z"/></svg>
+            <span>Admin</span>
+          </button>
+          <button class="tab" data-tab="models" data-role="admin" role="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
+            <span>Models</span>
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Status banner (pending approval, etc.) -->
+    <div id="status-banner" class="banner" hidden></div>
+    <!-- AI-offline banner (LLM stack stopped, e.g. to free RAM for images) -->
+    <div id="offline-banner" class="banner banner-warn" hidden></div>
+
+    <main class="content">
+
+      <!-- ---------------- CHAT ---------------- -->
+      <section class="panel" id="panel-chat" data-tab="chat" hidden>
+        <div class="chat-layout">
+          <aside class="chat-sidebar" id="chat-sidebar">
+            <div class="sidebar-head">
+              <h2>Chats</h2>
+              <button id="chat-new" class="btn btn-primary btn-sm">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                New
+              </button>
+            </div>
+            <ul id="conversation-list" class="conv-list"></ul>
+          </aside>
+
+          <div class="chat-main">
+            <div id="chat-messages" class="chat-messages" aria-live="polite">
+              <div class="empty-hint" id="chat-empty">Start a new chat or pick one from the list.</div>
+            </div>
+            <form id="chat-form" class="composer">
+              <div class="composer-row">
+                <button type="button" id="chat-mic" class="icon-btn chat-mic mic-btn" title="Record a voice message"
+                        aria-label="Record a voice message" hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                </button>
+                <textarea id="chat-input" rows="1" placeholder="Message the model&hellip; or tap the mic"
+                          autocomplete="off"></textarea>
+                <button type="submit" id="chat-send" class="btn btn-primary send-btn">Send</button>
+                <button type="button" id="chat-stop" class="btn btn-ghost" hidden>Stop</button>
+              </div>
+              <div class="chat-voice-bar composer-bar" id="chat-voice-bar" hidden>
+                <label class="speak-toggle switch" title="Read assistant replies aloud after voice messages">
+                  <input type="checkbox" id="speak-replies-toggle">
+                  <span class="track"></span>
+                  <span>&#128266; Speak replies</span>
+                </label>
+                <span class="voice-status" id="voice-status" aria-live="polite" hidden></span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------- NOTES ---------------- -->
+      <section class="panel" id="panel-notes" data-tab="notes" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Shared noticeboard</span>
+            <h2>Notes</h2>
+          </div>
+          <button id="note-new" class="btn btn-primary btn-sm">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            New note
+          </button>
+        </div>
+        <div id="notes-grid" class="notes-grid"></div>
+        <div class="empty-hint" id="notes-empty" hidden>No notes yet. Create your first one.</div>
+      </section>
+
+      <!-- ---------------- CHECKLISTS ---------------- -->
+      <section class="panel" id="panel-checklists" data-tab="checklists" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Get it done together</span>
+            <h2>Checklists</h2>
+          </div>
+          <form id="checklist-new-form" class="inline-form">
+            <input id="checklist-new-title" class="field" type="text" placeholder="New checklist title" maxlength="120" required>
+            <button type="submit" class="btn btn-primary btn-sm">Add</button>
+          </form>
+        </div>
+        <div id="checklists-list" class="checklists-list"></div>
+        <div class="empty-hint" id="checklists-empty" hidden>No checklists yet.</div>
+      </section>
+
+      <!-- ---------------- FILES & PHOTOS ---------------- -->
+      <section class="panel" id="panel-files" data-tab="files" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Household library</span>
+            <h2>Files &amp; Photos</h2>
+          </div>
+          <div class="files-filter">
+            <button class="chip chip-active" data-kind="">All</button>
+            <button class="chip" data-kind="file">Files</button>
+            <button class="chip" data-kind="photo">Photos</button>
+          </div>
+        </div>
+
+        <form id="search-form" class="search-row">
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="search-input" class="field" type="search" placeholder="Search your files &amp; photos&hellip;" maxlength="200">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Search</button>
+          <button type="button" id="search-clear" class="btn btn-ghost btn-sm" hidden>Clear</button>
+        </form>
+        <div id="search-results" class="search-results" hidden></div>
+
+        <div id="dropzone" class="dropzone" data-priv-gate="files_write">
+          <input id="file-input" type="file" multiple hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+          <p>Drag &amp; drop files here, or <button type="button" id="file-browse" class="btn-link">browse</button>.</p>
+          <label class="shared-toggle">
+            <input type="checkbox" id="upload-shared"> Share with the household
+          </label>
+        </div>
+        <div id="upload-progress" class="upload-progress" hidden></div>
+
+        <div id="files-grid" class="files-grid"></div>
+        <div class="empty-hint" id="files-empty" hidden>No files yet.</div>
+      </section>
+
+      <!-- ---------------- KEYS ---------------- -->
+      <section class="panel" id="panel-keys" data-tab="keys" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">For tinkerers</span>
+            <h2>API Keys</h2>
+          </div>
+          <form id="key-new-form" class="inline-form">
+            <input id="key-new-name" class="field" type="text" placeholder="Key name (e.g. phone app)" maxlength="80" required>
+            <button type="submit" class="btn btn-primary btn-sm">Create key</button>
+          </form>
+        </div>
+        <p class="muted">
+          Use these keys in other apps to talk to the household model. The plaintext key is shown
+          <strong>only once</strong> at creation &mdash; copy it then.
+        </p>
+        <div id="keys-list" class="keys-list card"></div>
+        <div class="empty-hint" id="keys-empty" hidden>No keys yet.</div>
+      </section>
+
+      <!-- ---------------- ADMIN ---------------- -->
+      <section class="panel" id="panel-admin" data-tab="admin" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Household admin</span>
+            <h2>People &amp; Devices</h2>
+          </div>
+          <button id="admin-refresh" class="btn btn-ghost btn-sm">Refresh</button>
+        </div>
+        <p class="muted">Approve new devices and assign a role &amp; privileges. Pending devices cannot use the hub until approved.</p>
+        <div id="devices-list" class="devices-list dev-grid"></div>
+        <div class="empty-hint" id="devices-empty" hidden>No devices found.</div>
+      </section>
+
+      <!-- ---------------- IMAGES ---------------- -->
+      <section class="panel" id="panel-images" data-tab="images" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Create</span>
+            <h2>Image Studio</h2>
+          </div>
+        </div>
+        <div id="images-body"></div>
+      </section>
+
+      <!-- ---------------- STUDIO (art/animation pipeline) ---------------- -->
+      <section class="panel" id="panel-studio" data-tab="studio" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Pipeline</span>
+            <h2>Studio</h2>
+          </div>
+          <div class="panel-head-actions">
+            <button id="studio-import" class="btn btn-ghost btn-sm">Import from Image Studio</button>
+            <label class="btn btn-primary btn-sm" for="studio-upload-input">Upload image</label>
+            <input id="studio-upload-input" type="file" accept="image/*" hidden>
+          </div>
+        </div>
+        <p class="muted">Pick a generated image, add motion (rig it in <strong>Rive</strong> and upload the <code>.riv</code>, or <strong>Auto‑animate</strong>), preview it, then mark it <strong>ready</strong>. Games read the manifest and use only <em>ready</em> assets.</p>
+        <div id="studio-list" class="studio-grid"></div>
+        <div class="empty-hint" id="studio-empty" hidden>No assets yet. Import from the Image Studio or upload an image.</div>
+      </section>
+
+      <!-- ---------------- MODELS ---------------- -->
+      <section class="panel" id="panel-models" data-tab="models" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Model control</span>
+            <h2>Models &amp; Resources</h2>
+          </div>
+          <div class="panel-head-actions">
+            <button id="models-refresh" class="btn btn-ghost btn-sm">Refresh</button>
+            <button id="models-scan" class="btn btn-ghost btn-sm" title="Register new Ollama models + import .gguf files from the models folder">Scan</button>
+            <button id="models-add" class="btn btn-primary btn-sm">Add New models</button>
+          </div>
+        </div>
+        <p class="muted">Start, suspend, resume or shut down each model. A <strong>suspended</strong> model stays in memory but stops answering; a <strong>stopped</strong> model is unloaded. Open <strong>Metrics</strong> for request &amp; token history.</p>
+
+        <div id="services-strip" class="services-strip" aria-label="Services"></div>
+        <div id="resources-strip" class="res-strip" aria-label="Live resources"></div>
+
+        <div id="models-list" class="models-groups"></div>
+        <div class="empty-hint" id="models-empty" hidden></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- Modal host (note editor, key reveal, device approval, etc.)   -->
+  <!-- ============================================================= -->
+  <div id="modal-root" class="modal-root overlay" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal" role="dialog" aria-modal="true">
+      <button class="modal-x icon-btn" data-modal-close aria-label="Close">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast host -->
+  <div id="toast-root" class="toast-root toasts" aria-live="polite"></div>
+
+  <!-- Reused hidden audio element for read-aloud / talk-loop playback -->
+  <audio id="voice-audio" hidden></audio>
+
+  <!-- Privilege list available to JS without re-fetching the contract -->
+  <template id="priv-template">
+    <label class="priv-check priv"><input type="checkbox" value="chat"> chat</label>
+    <label class="priv-check priv"><input type="checkbox" value="notes"> notes</label>
+    <label class="priv-check priv"><input type="checkbox" value="checklists"> checklists</label>
+    <label class="priv-check priv"><input type="checkbox" value="files_read"> files_read</label>
+    <label class="priv-check priv"><input type="checkbox" value="files_write"> files_write</label>
+    <label class="priv-check priv"><input type="checkbox" value="photos_read"> photos_read</label>
+    <label class="priv-check priv"><input type="checkbox" value="photos_write"> photos_write</label>
+    <label class="priv-check priv"><input type="checkbox" value="api_keys"> api_keys</label>
+  </template>
+
+  <!-- Rive web runtime (vendored locally — no CDN at runtime) for .riv previews -->
+  <script src="/static/vendor/rive/rive.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
