@@ -510,6 +510,18 @@ select.field, .role-select {
 .composer-bar { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; padding: var(--sp-2) 4px 0; }
 .voice-status { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; }
 
+/* --- composer model picker (admins) + cloud-egress notice --- */
+.composer-model { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding: 0 4px var(--sp-2); }
+.composer-model .field-label { margin: 0; }
+.chat-model-select {
+  min-height: 34px; max-width: 260px; padding: 0 10px; border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: var(--fs-sm);
+}
+.chat-cloud-notice {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text);
+  background: var(--pop-soft); padding: 3px 9px; border-radius: var(--r-pill);
+}
+
 /* ===========================================================================
  * Notes — masonry of pastel cards
  * ========================================================================= */
@@ -584,6 +596,97 @@ select.field, .role-select {
   border-radius: var(--r-md); background: var(--surface); color: var(--text);
 }
 .add-item-form input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+
+/* ===========================================================================
+ * Calendar & chores
+ * ========================================================================= */
+.cal-nav { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.cal-nav-title { flex: 1; text-align: center; font-size: var(--fs-lg); font-family: var(--font-head); }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-wd {
+  padding: 4px 0; text-align: center; font-size: var(--fs-xs); font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+}
+.cal-day {
+  min-height: 88px; padding: 6px; display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm);
+  min-width: 0;
+}
+.cal-day.cal-pad { background: transparent; border-color: transparent; }
+.cal-day.cal-today { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.cal-day.cal-today .cal-daynum { background: var(--accent); color: var(--accent-ink); }
+.cal-daynum {
+  width: 22px; height: 22px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; color: var(--muted);
+}
+.cal-dayname { display: none; font-size: var(--fs-xs); font-weight: 700; color: var(--muted); }
+
+/* event chips — colored per person (stable hash -> cal-p0..cal-p5) */
+.cal-chip {
+  display: block; width: 100%; padding: 2px 6px; border: none; border-radius: 6px;
+  text-align: left; font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-p0 { background: var(--accent-soft); color: var(--text); }
+.cal-p1 { background: var(--note-yellow); color: #2b2418; }
+.cal-p2 { background: var(--note-green);  color: #2b2418; }
+.cal-p3 { background: var(--note-blue);   color: #2b2418; }
+.cal-p4 { background: var(--note-pink);   color: #2b2418; }
+.cal-p5 { background: var(--note-purple); color: #2b2418; }
+
+/* upcoming (14 days) list */
+.cal-subhead { margin: var(--sp-5) 0 var(--sp-3); font-size: var(--fs-lg); font-family: var(--font-head); }
+.cal-upcoming { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cal-upcoming .empty-hint { padding: var(--sp-4); }
+.cal-up-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); width: 100%;
+  padding: var(--sp-2) var(--sp-3); text-align: left; font-size: var(--fs-sm);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--r-md); cursor: pointer; transition: border-color .15s ease;
+}
+.cal-up-row:hover { border-color: var(--accent); }
+.cal-up-date { flex: 0 0 92px; font-weight: 700; }
+.cal-up-time { flex: 0 0 56px; font-size: var(--fs-xs); color: var(--muted); }
+.cal-up-title { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-up-row .cal-chip.cal-up-person { width: auto; flex: 0 0 auto; border-radius: var(--r-pill); padding: 2px 9px; }
+.cal-up-recur { flex: 0 0 auto; font-size: var(--fs-xs); }
+
+/* chores */
+.cal-chores-head { margin-top: var(--sp-6); }
+.chores-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.chore-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); background: var(--surface);
+  border: 1px solid var(--border); border-left: 4px solid var(--border-strong);
+  border-radius: var(--r-md); box-shadow: var(--shadow-sm);
+}
+.chore-row.overdue { border-left-color: var(--danger); }
+.chore-row.overdue .chore-sub { color: var(--danger); font-weight: 600; }
+.chore-main { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 2px; }
+.chore-title { font-size: var(--fs-md); }
+.chore-sub { font-size: var(--fs-xs); color: var(--muted); }
+.chore-actions { display: flex; align-items: center; gap: var(--sp-2); }
+
+/* event / chore editor modal */
+.cal-editor { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cal-editor .field-label { margin: var(--sp-1) 0 0; }
+.cal-editor .cal-series-note { font-size: var(--fs-sm); }
+
+/* phones: the month grid collapses to a stacked agenda of days with events */
+@media (max-width: 640px) {
+  .cal-grid { grid-template-columns: 1fr; }
+  .cal-wd, .cal-day.cal-pad { display: none; }
+  .cal-day:not(:has(.cal-chip)):not(.cal-today) { display: none; }
+  .cal-day { min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .cal-dayname { display: inline; }
+  .cal-day .cal-chip { width: auto; flex: 1 1 100%; }
+  .cal-grid:not(:has(.cal-chip))::after {
+    content: "No events this month."; color: var(--muted);
+    text-align: center; padding: var(--sp-5) var(--sp-4);
+  }
+  .cal-up-date { flex-basis: 84px; }
+}
 
 /* ===========================================================================
  * Files & Photos
@@ -881,6 +984,20 @@ body.modal-open { overflow: hidden; }
 .role-badge.role-embed  { background: var(--surface-3); color: var(--muted); }
 .role-badge.role-stt,
 .role-badge.role-tts    { background: var(--success-soft); color: var(--success); }
+.role-badge.role-cloud  { background: var(--pop-soft); color: var(--text); }
+
+/* --- cloud providers section (Models tab) --- */
+.providers-section { margin-top: var(--sp-4); }
+.providers-hint { font-size: var(--fs-xs); margin-bottom: var(--sp-2); }
+.providers-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.provider-card .svc-status code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; }
+.provider-usage { font-size: var(--fs-xs); }
+.provider-budget-row { display: flex; align-items: center; gap: var(--sp-2); }
+.provider-budget-row .field-label { margin: 0; }
+.provider-budget-row .field { min-height: 34px; max-width: 130px; font-size: var(--fs-sm); }
+
+/* --- per-key cloud opt-in toggle (Keys page, admins) --- */
+.key-cloud-toggle { flex: 0 0 auto; }
 
 /* ===========================================================================
  * Settings dialog (theme palette + appearance mode)

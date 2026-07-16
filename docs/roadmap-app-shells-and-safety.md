@@ -31,7 +31,7 @@ This doc scopes and **phases** the wave. Every feature was checked against the r
 | **3** | **Wellbeing & ease‑of‑use** | Leverages existing local voice+LLM; low regulatory risk | M–L |
 | **4** | **Find‑my‑device** | Nice‑to‑have; tiered by honesty | M–L |
 
-*(The separate hybrid roadmap's **cloud AI providers** and **Home Assistant device layer** slot in parallel — HA in particular is a dependency for much of Phase 2/3 sensing.)*
+*(The separate hybrid roadmap's **cloud AI providers** (✅ now shipped — `docs/design/cloud-providers.md`, awaiting a key + restart) and **Home Assistant device layer** slot in parallel — HA in particular is a dependency for much of Phase 2/3 sensing.)*
 
 ---
 
@@ -120,7 +120,7 @@ Leads with what the appliance does uniquely well **and fully offline** (local vo
 | Mood check‑in & journaling | Emoji + voice/text journal, LLM reflects; **not a therapist** guardrails + crisis signposting | home‑hub / S |
 | Gentle voice nudges & **room intercom/broadcast** | LLM‑phrased announcements to hub + HA speakers; push‑to‑talk | home‑hub–hybrid / S–M |
 | **"Call home" / two‑way intercom to a phone** | Phone↔hub WebRTC (app open); ringing a **locked** phone needs native CallKit/ConnectionService + VoIP push | hybrid / XL |
-| Shared family calendar + chores | NL entry via LLM; **read‑only ICS** import (2‑way sync = cloud opt‑in) | hybrid / M |
+| Shared family calendar + chores | ✅ v1 **built** (recurrence + rotation, `docs/design/family-calendar.md`); still open: NL entry via LLM, **read‑only ICS** import (2‑way sync = cloud opt‑in) | hybrid / M |
 | **Accessibility** (large‑text, high‑contrast, voice‑only) | Per‑profile theming + full hands‑free loop (STT+TTS+LLM) | pwa/home‑hub / S–M |
 | Simple onboarding | Guided first‑run wizard + LLM setup assistant; IP fallback if mDNS flaky | pwa / M |
 
@@ -141,8 +141,8 @@ Leads with what the appliance does uniquely well **and fully offline** (local vo
 
 ## Cross‑cutting needs (all phases)
 - **Auth/RBAC:** new privileges (`safety_admin`, `devices_control`, `medical_read`, `cloud_ai`…); guests never see medical/location/camera.
-- **Encrypted‑at‑rest store** for medical IDs, contacts, provider/HA tokens (today only *hashes* issued keys — add a real encrypted store).
-- **Egress allowlist** (evolve the offline hardening): APNs/FCM, SIP/VoIP, public weather feeds — each a **disclosed** exception on a privacy dashboard.
+- **Encrypted‑at‑rest store** — ✅ **built** (Fernet store on the hub, `docs/design/secret-store.md`); medical IDs/contacts/HA tokens can now use it.
+- **Egress allowlist** — ✅ **built** (per‑service systemd eBPF lock, `docs/design/platform-activation.md`; sudo activation pending): APNs/FCM, SIP/VoIP, public weather feeds each become a **disclosed** exception on a privacy dashboard.
 - **Home Assistant** is the sensor/actuator dependency for most of Phase 2/3.
 - **Native shells + APNs/FCM** (Phase 1b) gate reliable phone alerting everywhere.
 - **Kids‑safety filter** (still owed) applies to anything voiced to children.

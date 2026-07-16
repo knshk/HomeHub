@@ -136,6 +136,15 @@ async def messages(request: Request,
         code_status, message, code = blocked
         raise openai_error(code_status, message, "service_unavailable", code)
 
+    # Cloud-provider aliases cannot be served by this shim: it forwards to the
+    # Ollama upstream, which does not know them. Reject explicitly instead of
+    # silently misrouting (same stance as /v1/completions in openai_routes).
+    model_row = db.get_model_by_alias_or_tag(client_model)
+    if model_row is not None and (model_row.get("provider") or "local") != "local":
+        raise openai_error(status.HTTP_400_BAD_REQUEST,
+                           "Cloud models are only available via /v1/chat/completions.",
+                           "invalid_request_error", "cloud_chat_only")
+
     is_stream = bool(anthropic_req.get("stream", False))
     payload = _to_openai_payload(anthropic_req)
     upstream_url = f"{settings.ollama_base_url}/v1/chat/completions"

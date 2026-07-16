@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TEXT NOT NULL,
     revoked INTEGER NOT NULL DEFAULT 0,
     rpm_limit INTEGER NOT NULL DEFAULT 60,
-    daily_token_limit INTEGER NOT NULL DEFAULT 0
+    daily_token_limit INTEGER NOT NULL DEFAULT 0,
+    cloud_allowed INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS usage_log (
@@ -50,6 +51,23 @@ CREATE TABLE IF NOT EXISTS managed_models (
     display_name TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'chat',
     state TEXT NOT NULL DEFAULT 'stopped',
+    provider TEXT NOT NULL DEFAULT 'local',
+    upstream_model TEXT DEFAULT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- BYO-key cloud AI providers. The API key is stored Fernet-encrypted (never
+-- plaintext); ``key_hint`` is a short masked display string. ``enabled`` is the
+-- admin opt-in switch and ``monthly_token_budget`` (0 = unlimited) caps the
+-- calendar-month token spend across all models of that provider.
+CREATE TABLE IF NOT EXISTS providers (
+    name TEXT PRIMARY KEY,
+    api_key_encrypted BLOB,
+    key_hint TEXT,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    monthly_token_budget INTEGER NOT NULL DEFAULT 0,
+    base_url TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -66,6 +84,8 @@ CREATE TABLE IF NOT EXISTS model_dismissed (
 MODEL_STATES = ("stopped", "running", "suspended")
 # Roles a managed model can play (informational; drives dashboard grouping).
 MODEL_ROLES = ("chat", "vision", "embed")
+# Cloud providers the gateway knows how to dispatch to ('local' means Ollama).
+PROVIDER_NAMES = ("anthropic", "openai")
 
 
 def utcnow_iso() -> str:
@@ -99,6 +119,27 @@ def init_db() -> None:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(managed_models)")}
         if "role" not in cols:
             conn.execute("ALTER TABLE managed_models ADD COLUMN role TEXT NOT NULL DEFAULT 'chat'")
+        # Migration: cloud-provider columns on pre-existing databases.
+        if "provider" not in cols:
+            conn.execute("ALTER TABLE managed_models ADD COLUMN provider TEXT NOT NULL DEFAULT 'local'")
+        if "upstream_model" not in cols:
+            conn.execute("ALTER TABLE managed_models ADD COLUMN upstream_model TEXT DEFAULT NULL")
+        key_cols = {r["name"] for r in conn.execute("PRAGMA table_info(api_keys)")}
+        if "cloud_allowed" not in key_cols:
+            conn.execute("ALTER TABLE api_keys ADD COLUMN cloud_allowed INTEGER NOT NULL DEFAULT 0")
+        # Seed the known providers, disabled, so the admin UI always has rows to
+        # act on. Idempotent: existing rows (keys, budgets) are never touched.
+        now = utcnow_iso()
+        for name in PROVIDER_NAMES:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO providers
+                    (name, api_key_encrypted, key_hint, enabled,
+                     monthly_token_budget, base_url, created_at, updated_at)
+                VALUES (?, NULL, NULL, 0, 0, NULL, ?, ?)
+                """,
+                (name, now, now),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -160,7 +201,8 @@ def list_keys() -> List[Dict[str, Any]]:
     try:
         rows = conn.execute(
             """
-            SELECT id, name, key_prefix, created_at, revoked, rpm_limit, daily_token_limit
+            SELECT id, name, key_prefix, created_at, revoked, rpm_limit,
+                   daily_token_limit, cloud_allowed
             FROM api_keys
             ORDER BY id DESC
             """
@@ -175,6 +217,20 @@ def revoke_key(key_id: int) -> bool:
     conn = get_connection()
     try:
         cur = conn.execute("UPDATE api_keys SET revoked = 1 WHERE id = ?", (key_id,))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def set_key_cloud_allowed(key_id: int, allowed: bool) -> bool:
+    """Toggle a key's per-key cloud opt-in. Returns True if a row was updated."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE api_keys SET cloud_allowed = ? WHERE id = ?",
+            (1 if allowed else 0, key_id),
+        )
         conn.commit()
         return cur.rowcount > 0
     finally:
@@ -252,7 +308,8 @@ def list_usage(limit: int = 200) -> List[Dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Managed-model registry (control plane)
 # --------------------------------------------------------------------------- #
-_MODEL_COLS = "alias, ollama_tag, display_name, role, state, created_at, updated_at"
+_MODEL_COLS = ("alias, ollama_tag, display_name, role, state, provider, "
+               "upstream_model, created_at, updated_at")
 
 
 def list_models() -> List[Dict[str, Any]]:
@@ -301,23 +358,33 @@ def get_model_by_alias_or_tag(name: str) -> Optional[Dict[str, Any]]:
 
 
 def upsert_model(alias: str, ollama_tag: str, display_name: str,
-                 role: str = "chat", state: str = "stopped") -> Dict[str, Any]:
-    """Insert or update a managed model. Returns the stored row."""
+                 role: str = "chat", state: str = "stopped",
+                 provider: str = "local",
+                 upstream_model: Optional[str] = None) -> Dict[str, Any]:
+    """Insert or update a managed model. Returns the stored row.
+
+    ``provider`` is 'local' for Ollama-served models, else a cloud provider
+    name; ``upstream_model`` is the provider-side model id for cloud models.
+    """
     now = utcnow_iso()
     conn = get_connection()
     try:
         conn.execute(
             """
             INSERT INTO managed_models
-                (alias, ollama_tag, display_name, role, state, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (alias, ollama_tag, display_name, role, state, provider,
+                 upstream_model, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(alias) DO UPDATE SET
                 ollama_tag = excluded.ollama_tag,
                 display_name = excluded.display_name,
                 role = excluded.role,
+                provider = excluded.provider,
+                upstream_model = excluded.upstream_model,
                 updated_at = excluded.updated_at
             """,
-            (alias, ollama_tag, display_name, role, state, now, now),
+            (alias, ollama_tag, display_name, role, state, provider,
+             upstream_model, now, now),
         )
         conn.commit()
         row = conn.execute(
@@ -417,6 +484,108 @@ def seed_models(entries: List[Dict[str, str]]) -> None:
                  e.get("role") or "chat", now, now),
             )
         conn.commit()
+    finally:
+        conn.close()
+
+
+# --------------------------------------------------------------------------- #
+# Cloud providers (BYO-key registry)
+# --------------------------------------------------------------------------- #
+def get_provider(name: str) -> Optional[Dict[str, Any]]:
+    """Return one provider row (including the encrypted key blob), or None."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM providers WHERE name = ?", (name,)
+        ).fetchone()
+        return _row_to_dict(row)
+    finally:
+        conn.close()
+
+
+def list_providers() -> List[Dict[str, Any]]:
+    """Return all provider rows ordered by name.
+
+    Rows include ``api_key_encrypted``; callers that expose data outward must
+    strip it (see ``providers.list_providers`` for the sanitised view).
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute("SELECT * FROM providers ORDER BY name").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def set_provider_key(name: str, api_key_encrypted: bytes, key_hint: str) -> bool:
+    """Store the encrypted API key + display hint. True if a row was updated."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE providers SET api_key_encrypted = ?, key_hint = ?, "
+            "updated_at = ? WHERE name = ?",
+            (api_key_encrypted, key_hint, utcnow_iso(), name),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def set_provider_enabled(name: str, enabled: bool) -> bool:
+    """Flip the provider opt-in switch. Returns True if a row was updated."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE providers SET enabled = ?, updated_at = ? WHERE name = ?",
+            (1 if enabled else 0, utcnow_iso(), name),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def set_provider_budget(name: str, monthly_token_budget: int) -> bool:
+    """Set the calendar-month token budget (0 = unlimited)."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE providers SET monthly_token_budget = ?, updated_at = ? "
+            "WHERE name = ?",
+            (max(0, int(monthly_token_budget)), utcnow_iso(), name),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def provider_month_usage(provider: str, month_prefix: str) -> int:
+    """Total tokens logged this calendar month against a provider's models.
+
+    Cloud requests are logged with the client-facing name — usually the alias,
+    but callers may also address a model by its provider-side id (stored in
+    ``ollama_tag``), so both names must count or budget spend leaks past the
+    cap. ``month_prefix`` is the ``YYYY-MM`` prefix of the ISO timestamp.
+    """
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(u.prompt_tokens), 0)
+                   + COALESCE(SUM(u.completion_tokens), 0) AS total
+            FROM usage_log u
+            WHERE u.ts LIKE ?
+              AND u.model IN (
+                    SELECT alias FROM managed_models WHERE provider = ?
+                    UNION
+                    SELECT ollama_tag FROM managed_models WHERE provider = ?
+              )
+            """,
+            (f"{month_prefix}%", provider, provider),
+        ).fetchone()
+        return int(row["total"]) if row and row["total"] is not None else 0
     finally:
         conn.close()
 

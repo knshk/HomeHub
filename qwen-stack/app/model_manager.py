@@ -185,12 +185,15 @@ async def apply_action(alias: str, action: str) -> Dict[str, Any]:
     tag = m["ollama_tag"]
 
     # Side effects. State is written first so the serve-gate reflects intent
-    # immediately; the (slow) warm-load runs in the background.
+    # immediately; the (slow) warm-load runs in the background. Cloud-provider
+    # models have no Ollama process to warm or evict — every action is a pure
+    # state change for them (the serve-gate still enforces suspended/stopped).
     db.set_model_state(alias, new_state)
-    if action == "start":
-        asyncio.create_task(ollama_load(tag))
-    elif action == "shutdown":
-        await ollama_unload(tag)
+    if (m.get("provider") or "local") == "local":
+        if action == "start":
+            asyncio.create_task(ollama_load(tag))
+        elif action == "shutdown":
+            await ollama_unload(tag)
     # suspend/resume are gate-only; the model stays resident.
 
     updated = db.get_model(alias) or m

@@ -15,9 +15,11 @@ from . import (
     routes_chat,
     routes_notes,
     routes_checklists,
+    routes_calendar,
     routes_files,
     routes_keys,
     routes_admin,
+    routes_secrets,
     routes_voice,
     routes_studio,
 )
@@ -54,9 +56,11 @@ def create_app() -> FastAPI:
     app.include_router(routes_chat.router)
     app.include_router(routes_notes.router)
     app.include_router(routes_checklists.router)
+    app.include_router(routes_calendar.router)
     app.include_router(routes_files.router)
     app.include_router(routes_keys.router)
     app.include_router(routes_admin.router)
+    app.include_router(routes_secrets.router)
     app.include_router(routes_voice.router)
     app.include_router(routes_studio.router)
 

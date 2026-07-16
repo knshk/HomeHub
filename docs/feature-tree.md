@@ -16,10 +16,11 @@ Last updated: **2026‑07‑16**
 │   ├── 🟢 systemd boot persistence + auto‑restart (hub, ollama, gateway, voice)
 │   ├── 🟢 AI ↔ Image mode exclusivity (16 GB RAM guard) + mode scripts
 │   ├── 🟢 Resource guards (job serialization, free‑memory check, thread caps, nice)
-│   ├── 🟡 mDNS name homehub.local (works now; systemd unit ready — sudo enable pending)
-│   ├── 🟡 Local HTTPS :443 (CA + cert generated & TLS‑verified; unit ready — sudo enable pending)
+│   ├── 🟡 mDNS name homehub.local (built & verified — single sudo command to activate: sudo bash installer/enable-platform.sh)
+│   ├── 🟡 Local HTTPS :443 (built & verified — same single sudo command: sudo bash installer/enable-platform.sh)
 │   ├── 🟢 Privacy hardening (external telemetry OFF, model libs offline, verified 0 phone‑home)
-│   ├── 🟠 Egress firewall allowlist (belt‑and‑suspenders lock; needs sudo)
+│   ├── 🟡 Egress firewall allowlist (built & verified — per‑service systemd eBPF lock; activate: sudo installer/egress.sh lock; see docs/design/platform-activation.md)
+│   ├── 🟢 Tests: offline pytest suites for gateway + hub (50 tests, tmp‑sqlite, no network)
 │   └── 🟢 Off‑box backup to GitHub (code, config, docs — no models/secrets)
 │
 ├── 👨‍👩‍👧 Family & Access
@@ -27,20 +28,20 @@ Last updated: **2026‑07‑16**
 │   ├── 🟢 Roles (admin / member / guest) + granular privileges
 │   ├── 🟢 Admin device approval & revocation UI
 │   ├── 🟢 Per‑user API keys (BYO‑key, shown once, hashed at rest)
-│   └── 🔵 Encrypted‑at‑rest secret store (needed for cloud providers / HA tokens)
+│   └── 🟢 Encrypted‑at‑rest secret store (Fernet, write‑only API, hint‑masked — docs/design/secret-store.md)
 │
 ├── 🤖 AI Assistant (100 % local — no internet needed)
 │   ├── 🟢 Chat (qwen2.5‑7b) with conversations & streaming
 │   ├── 🟢 Vision / photo captions (moondream)
 │   ├── 🟢 Semantic search embeddings (nomic‑embed‑text)
 │   ├── 🟢 Voice chat (mic → STT → LLM → spoken replies)
-│   └── 🔵 Cloud AI providers (Anthropic/OpenAI API keys, budgets, per‑user gating)
+│   └── 🟡 Cloud AI providers (shipped — needs an API key + service restart to go live; docs/design/cloud-providers.md)
 │
 ├── 🗂️ Household Content
 │   ├── 🟢 Notes (shared noticeboard)
 │   ├── 🟢 Checklists
 │   ├── 🟢 Files & Photos (upload, shared/private, semantic + photo search)
-│   └── 🔵 Shared family calendar & chores (NL entry, ICS import)
+│   └── 🟢 Shared family calendar & chores (recurrence + rotation; live after next hub restart — docs/design/family-calendar.md; NL entry/ICS still 🔵)
 │
 ├── 🎨 Image Generation
 │   ├── 🟢 FLUX.1‑schnell GGUF — default mode (commercial‑safe Apache‑2.0, TV‑quality)
@@ -109,13 +110,13 @@ Last updated: **2026‑07‑16**
 ## Snapshot by the numbers
 | Status | Count | Meaning |
 |---|---|---|
-| 🟢 Completed | **38** | Built, verified, in production on the appliance |
-| 🟡 Partial | **4** | Built & tested; one activation step remains (2× sudo enable, HTTPS‑gated PWA install, router name) |
-| 🟠 Pending | **3** | Agreed/required, not yet built — **kids NSFW filter is the critical one** |
-| 🔵 Future (Pro) | **30+** | Scoped & feasibility‑verified; companion‑app / backend tier |
+| 🟢 Completed | **43** | Built, verified, in production on the appliance (calendar + secret store live after the next hub restart) |
+| 🟡 Partial | **6** | Built & tested; one activation step remains (sudo enable‑platform, egress lock, cloud API key + restart, HTTPS‑gated PWA install, router name) |
+| 🟠 Pending | **2** | Agreed/required, not yet built — **kids NSFW filter is the critical one** |
+| 🔵 Future (Pro) | **25+** | Scoped & feasibility‑verified; companion‑app / backend tier |
 
 ## The short "what's next" list
 1. **Kids‑safety/NSFW image filter** 🟠 — mandatory before children see generated art.
-2. Two sudo one‑liners 🟡 — enable `home-hub-https.service` (unlocks full Android/desktop PWA) and `homehub-mdns.service` (makes `homehub.local` survive reboots).
-3. **Egress firewall allowlist** 🟠 — completes the privacy hardening.
+2. One sudo command 🟡 — `sudo bash installer/enable-platform.sh` activates HTTPS :443 (full Android/desktop PWA) + reboot‑proof `homehub.local`; then optionally `sudo installer/egress.sh lock` for the LAN‑only egress lock. Verify with `installer/verify-platform.sh` (no sudo).
+3. Restart hub + gateway 🟡 — brings the merged calendar, secret store and cloud‑provider code live; add a provider API key (+ per‑key opt‑in) only if cloud AI is wanted.
 4. Then the Pro track per `roadmap-app-shells-and-safety.md` (native shells first).

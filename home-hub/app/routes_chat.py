@@ -108,6 +108,13 @@ async def post_message(conv_id: int, request: Request, payload: dict = Body(defa
     role = device["role"]
     now = _now()
 
+    # Optional model override (a gateway alias — local or cloud). Admin-only:
+    # cloud models send the conversation outside the home, so regular members
+    # always stay on the house default.
+    model = str(payload.get("model") or "").strip()[:100] or None
+    if model is not None and role != "admin":
+        raise HubError(403, "Only admins may choose a model", "forbidden")
+
     conn = db.connect()
     try:
         _own_conversation(conn, conv_id, username, role)
@@ -132,7 +139,7 @@ async def post_message(conv_id: int, request: Request, payload: dict = Body(defa
         async def gen():
             assembled = []
             try:
-                async for sse in integration.chat_completion_stream(history):
+                async for sse in integration.chat_completion_stream(history, model=model):
                     assembled.append(integration.extract_delta(sse))
                     yield sse
             except HubError as e:
@@ -162,7 +169,7 @@ async def post_message(conv_id: int, request: Request, payload: dict = Body(defa
         )
 
     # Non-streaming.
-    answer = await integration.chat_completion(history)
+    answer = await integration.chat_completion(history, model=model)
     conn = db.connect()
     try:
         db.execute(

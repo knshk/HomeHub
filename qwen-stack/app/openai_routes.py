@@ -20,10 +20,10 @@ import time
 from typing import Any, Dict, Optional, Tuple
 
 import httpx
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from . import db, model_manager
+from . import db, model_manager, providers
 from .auth import openai_error, require_api_key
 from .config import ALIAS_MAP, resolve_model, settings
 
@@ -88,10 +88,24 @@ async def _forward_completion(
         )
 
     # Serve-gate: managed models that are suspended/stopped are not served.
+    # This applies to cloud models too (the admin kill-switch).
     blocked = model_manager.serve_check(client_model)
     if blocked:
         code_status, message, code = blocked
         raise openai_error(code_status, message, "service_unavailable", code)
+
+    # Cloud routing seam: models registered against a cloud provider bypass the
+    # Ollama upstream entirely and dispatch through providers.py.
+    model_row = db.get_model_by_alias_or_tag(client_model)
+    if model_row is not None and (model_row.get("provider") or "local") != "local":
+        if upstream_path != "/v1/chat/completions":
+            raise openai_error(
+                status.HTTP_400_BAD_REQUEST,
+                "Cloud models are only available via /v1/chat/completions.",
+                "invalid_request_error",
+                "cloud_chat_only",
+            )
+        return await _cloud_completion(payload, key_row, model_row, client_model)
 
     payload["model"] = resolve_model(client_model)
     is_stream = bool(payload.get("stream", False))
@@ -237,6 +251,173 @@ async def _stream_upstream(
     )
 
 
+# --------------------------------------------------------------------------- #
+# Cloud dispatch (BYO-key providers; see providers.py)
+# --------------------------------------------------------------------------- #
+def _provider_http_error(exc: providers.ProviderError) -> HTTPException:
+    """Map a ProviderError onto an OpenAI-style HTTPException.
+
+    Forwards retry-after on 429s so well-behaved clients can back off.
+    """
+    headers = {"retry-after": exc.retry_after} if exc.retry_after else None
+    return HTTPException(
+        status_code=exc.status_code,
+        detail={"error": {"message": exc.message, "type": "upstream_error",
+                          "code": exc.code}},
+        headers=headers,
+    )
+
+
+async def _cloud_completion(
+    payload: Dict[str, Any],
+    key_row: Dict[str, Any],
+    model_row: Dict[str, Any],
+    client_model: str,
+) -> Any:
+    """Gate + dispatch a chat completion to a cloud provider.
+
+    Gating order: per-key opt-in (403) -> provider enabled + key present (503)
+    -> monthly budget (429). Usage is logged exactly like local traffic, with
+    the client alias as the model name.
+    """
+    provider_name = model_row["provider"]
+    provider_row = db.get_provider(provider_name)
+    month_tokens = providers.month_usage(provider_name)
+    ok, code_status, message = providers.gate_cloud_request(
+        bool(key_row.get("cloud_allowed")), provider_row, month_tokens)
+    if not ok:
+        if code_status == status.HTTP_403_FORBIDDEN:
+            raise openai_error(code_status, message, "cloud_not_allowed",
+                               "cloud_not_allowed")
+        if code_status == status.HTTP_429_TOO_MANY_REQUESTS:
+            raise openai_error(code_status, message, "rate_limit_error",
+                               "cloud_budget_exhausted")
+        raise openai_error(code_status, message, "service_unavailable",
+                           "provider_not_available")
+
+    upstream_model = model_row.get("upstream_model") or model_row["ollama_tag"]
+    if provider_name == "anthropic":
+        _, body = providers.openai_to_anthropic({**payload, "model": upstream_model})
+    else:
+        # OpenAI upstream speaks our client protocol — passthrough, retagged.
+        body = {**payload, "model": upstream_model}
+
+    is_stream = bool(payload.get("stream", False))
+    key_id = int(key_row["id"])
+    if is_stream:
+        return _cloud_stream(provider_row, provider_name, body, key_id, client_model)
+    return await _cloud_json(provider_row, provider_name, body, key_id, client_model)
+
+
+async def _cloud_json(
+    provider_row: Dict[str, Any],
+    provider_name: str,
+    body: Dict[str, Any],
+    key_id: int,
+    client_model: str,
+) -> JSONResponse:
+    """Non-streaming cloud dispatch: forward, translate, log, respond."""
+    try:
+        resp_json = await providers.call_provider(provider_row, body, stream=False)
+    except providers.ProviderError as exc:
+        db.log_usage(key_id, client_model, 0, 0, exc.status_code)
+        raise _provider_http_error(exc)
+
+    if provider_name == "anthropic":
+        out = providers.anthropic_to_openai_response(resp_json, client_model)
+    else:
+        out = resp_json if isinstance(resp_json, dict) else {}
+        if out.get("model"):
+            out["model"] = client_model
+
+    prompt_tokens, completion_tokens = _extract_usage(out)
+    db.log_usage(key_id, client_model, prompt_tokens, completion_tokens,
+                 status.HTTP_200_OK)
+    return JSONResponse(content=out)
+
+
+def _cloud_stream(
+    provider_row: Dict[str, Any],
+    provider_name: str,
+    body: Dict[str, Any],
+    key_id: int,
+    client_model: str,
+) -> StreamingResponse:
+    """Streaming cloud dispatch, emitting OpenAI-style SSE to the client.
+
+    Anthropic upstream SSE is translated event-by-event; OpenAI upstream SSE is
+    passed through with the model retagged. Usage is parsed for logging.
+    """
+    if provider_name == "openai":
+        # Ask the upstream for usage in the terminal chunk.
+        body = dict(body)
+        body.setdefault("stream_options", {"include_usage": True})
+
+    async def gen():
+        prompt_tokens, completion_tokens = 0, 0
+        final_status = status.HTTP_200_OK
+        try:
+            lines = await providers.call_provider(provider_row, body, stream=True)
+            event_type: Optional[str] = None
+            async for line in lines:
+                if provider_name == "anthropic":
+                    event_type, data_json = providers.parse_sse_line(line, event_type)
+                    if data_json is None:
+                        continue
+                    et = event_type or str(data_json.get("type") or "")
+                    if et == "message_start":
+                        u = (data_json.get("message") or {}).get("usage") or {}
+                        prompt_tokens = int(u.get("input_tokens") or 0) or prompt_tokens
+                    elif et == "message_delta":
+                        u = data_json.get("usage") or {}
+                        completion_tokens = (int(u.get("output_tokens") or 0)
+                                             or completion_tokens)
+                    chunks = providers.anthropic_sse_to_openai_chunks(
+                        et, data_json, client_model)
+                    if chunks is None:
+                        yield b"data: [DONE]\n\n"
+                        break
+                    for ch in chunks:
+                        yield f"data: {json.dumps(ch)}\n\n".encode("utf-8")
+                else:
+                    # OpenAI passthrough: retag model, harvest usage, forward.
+                    out_line = line
+                    if line.startswith("data: "):
+                        data_part = line[len("data: "):].strip()
+                        if data_part and data_part != "[DONE]":
+                            try:
+                                chunk = json.loads(data_part)
+                            except (ValueError, TypeError):
+                                chunk = None
+                            if isinstance(chunk, dict):
+                                if chunk.get("usage"):
+                                    p, c = _extract_usage(chunk)
+                                    prompt_tokens = p or prompt_tokens
+                                    completion_tokens = c or completion_tokens
+                                if "model" in chunk:
+                                    chunk["model"] = client_model
+                                out_line = "data: " + json.dumps(chunk)
+                    if out_line == "":
+                        yield b"\n"
+                    else:
+                        yield (out_line + "\n").encode("utf-8")
+        except providers.ProviderError as exc:
+            final_status = exc.status_code
+            err = {"error": {"message": exc.message, "type": "upstream_error",
+                             "code": exc.code}}
+            yield f"data: {json.dumps(err)}\n\n".encode("utf-8")
+            yield b"data: [DONE]\n\n"
+        finally:
+            db.log_usage(key_id, client_model, prompt_tokens, completion_tokens,
+                         final_status)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.post("/v1/chat/completions")
 async def chat_completions(request: Request,
                            key_row: Dict[str, Any] = Depends(require_api_key)) -> Any:
@@ -280,9 +461,20 @@ async def list_models(key_row: Dict[str, Any] = Depends(require_api_key)) -> JSO
         if client_name not in ids:
             ids.append(client_name)
 
+    # Managed models (incl. cloud-provider entries with no Ollama tag upstream)
+    # are always listed; the provider field lets UIs badge cloud models.
+    provider_by_name: Dict[str, str] = {}
+    for m in db.list_models():
+        prov = m.get("provider") or "local"
+        provider_by_name[m["alias"]] = prov
+        provider_by_name[m["ollama_tag"]] = prov
+        if m["alias"] not in ids:
+            ids.append(m["alias"])
+
     created = int(time.time())
     data = [
-        {"id": mid, "object": "model", "owned_by": "qwen-stack", "created": created}
+        {"id": mid, "object": "model", "owned_by": "qwen-stack",
+         "created": created, "provider": provider_by_name.get(mid, "local")}
         for mid in ids
     ]
     return JSONResponse(content={"object": "list", "data": data})

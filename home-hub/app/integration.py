@@ -32,10 +32,14 @@ def _admin_headers() -> dict:
 # ----------------------------------------------------------------------------
 # Gateway: chat completions (non-streaming + streaming SSE passthrough)
 # ----------------------------------------------------------------------------
-async def chat_completion(messages: list[dict]) -> str:
-    """Non-streaming chat completion. Returns the assistant text content."""
+async def chat_completion(messages: list[dict], model: str | None = None) -> str:
+    """Non-streaming chat completion. Returns the assistant text content.
+
+    ``model`` overrides the default house model (an alias managed by the
+    gateway — local or cloud); when absent the configured default is used.
+    """
     url = f"{config.GATEWAY_URL}/v1/chat/completions"
-    payload = {"model": config.CHAT_MODEL, "messages": messages, "stream": False}
+    payload = {"model": model or config.CHAT_MODEL, "messages": messages, "stream": False}
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             r = await client.post(url, headers=_gateway_headers(), json=payload)
@@ -50,16 +54,19 @@ async def chat_completion(messages: list[dict]) -> str:
         raise HubError(502, f"Bad gateway response: {e}", "gateway_error")
 
 
-async def chat_completion_stream(messages: list[dict]) -> AsyncGenerator[str, None]:
+async def chat_completion_stream(messages: list[dict],
+                                 model: str | None = None) -> AsyncGenerator[str, None]:
     """Stream SSE chunks from the gateway. Yields raw SSE lines (text) to relay
     straight through to the browser. Also collects nothing here — the caller
     reconstructs assembled content separately if needed.
+
+    ``model`` overrides the default house model (see chat_completion).
 
     Yields strings already terminated with the SSE framing (\n\n) so they can be
     written directly to a text/event-stream response.
     """
     url = f"{config.GATEWAY_URL}/v1/chat/completions"
-    payload = {"model": config.CHAT_MODEL, "messages": messages, "stream": True}
+    payload = {"model": model or config.CHAT_MODEL, "messages": messages, "stream": True}
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             async with client.stream("POST", url, headers=_gateway_headers(), json=payload) as r:

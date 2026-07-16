@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import auth, db, model_manager
+from . import auth, db, model_manager, providers
 from .config import settings
 
 # Client-facing aliases become URL path segments, so keep them path-safe.
@@ -123,6 +123,122 @@ async def usage(limit: int = 200, _: bool = Depends(require_admin)) -> JSONRespo
     """Return recent usage rows (newest first)."""
     limit = max(1, min(int(limit), 1000))
     return JSONResponse(content={"usage": db.list_usage(limit=limit)})
+
+
+class KeyCloudRequest(BaseModel):
+    """Body for toggling a key's cloud opt-in."""
+
+    allowed: bool
+
+
+@router.post("/keys/{key_id}/cloud")
+async def set_key_cloud(key_id: int, body: KeyCloudRequest,
+                        _: bool = Depends(require_admin)) -> JSONResponse:
+    """Toggle whether an API key may use cloud models (opt-in per key)."""
+    if not db.set_key_cloud_allowed(key_id, body.allowed):
+        raise _admin_error(status.HTTP_404_NOT_FOUND, f"Key {key_id} not found.")
+    return JSONResponse(content={"ok": True, "id": key_id,
+                                 "cloud_allowed": body.allowed})
+
+
+# --------------------------------------------------------------------------- #
+# Cloud providers (BYO-key)
+# --------------------------------------------------------------------------- #
+class ProviderKeyRequest(BaseModel):
+    """Body for storing a provider API key (encrypted at rest)."""
+
+    api_key: str = Field(..., min_length=8, max_length=500)
+
+
+class ProviderEnableRequest(BaseModel):
+    """Body for flipping a provider's opt-in switch."""
+
+    enabled: bool
+
+
+class ProviderBudgetRequest(BaseModel):
+    """Body for setting a provider's calendar-month token budget."""
+
+    monthly_token_budget: int = Field(..., ge=0)
+
+
+class AddCloudModelRequest(BaseModel):
+    """Register a cloud model alias against a provider-side model id."""
+
+    alias: str = Field(..., min_length=1, max_length=100)
+    upstream_model: str = Field(..., min_length=1, max_length=200)
+    display_name: Optional[str] = Field(default=None, max_length=200)
+
+
+def _require_provider(name: str) -> Dict[str, Any]:
+    row = db.get_provider(name)
+    if row is None:
+        raise _admin_error(status.HTTP_404_NOT_FOUND,
+                           f"Provider '{name}' is not registered.")
+    return row
+
+
+@router.get("/providers")
+async def get_providers(_: bool = Depends(require_admin)) -> JSONResponse:
+    """List providers: masked key hint, enabled flag, budget and month usage."""
+    out = []
+    for p in providers.list_providers():
+        out.append({**p, "month_usage_tokens": providers.month_usage(p["name"])})
+    return JSONResponse(content={"providers": out})
+
+
+@router.put("/providers/{name}/key")
+async def put_provider_key(name: str, body: ProviderKeyRequest,
+                           _: bool = Depends(require_admin)) -> JSONResponse:
+    """Store a provider API key. Only the masked hint is ever returned."""
+    _require_provider(name)
+    hint = providers.set_key(name, body.api_key.strip())
+    return JSONResponse(content={"ok": True, "name": name, "key_hint": hint})
+
+
+@router.post("/providers/{name}/enable")
+async def enable_provider(name: str, body: ProviderEnableRequest,
+                          _: bool = Depends(require_admin)) -> JSONResponse:
+    """Enable/disable a provider (requests also need a stored key)."""
+    _require_provider(name)
+    providers.enable(name, body.enabled)
+    return JSONResponse(content={"ok": True, "name": name,
+                                 "enabled": body.enabled})
+
+
+@router.put("/providers/{name}/budget")
+async def put_provider_budget(name: str, body: ProviderBudgetRequest,
+                              _: bool = Depends(require_admin)) -> JSONResponse:
+    """Set the monthly token budget for a provider (0 = unlimited)."""
+    _require_provider(name)
+    providers.set_budget(name, body.monthly_token_budget)
+    return JSONResponse(content={"ok": True, "name": name,
+                                 "monthly_token_budget": body.monthly_token_budget})
+
+
+@router.post("/providers/{name}/models")
+async def add_cloud_model(name: str, body: AddCloudModelRequest,
+                          _: bool = Depends(require_admin)) -> JSONResponse:
+    """Register a cloud model alias. Cloud models start 'running' — there is
+    no local process to warm, so the state is a pure serve-gate switch."""
+    _require_provider(name)
+    alias = body.alias.strip()
+    upstream_model = body.upstream_model.strip()
+    if not _ALIAS_RE.match(alias):
+        raise _admin_error(status.HTTP_400_BAD_REQUEST,
+                           "Alias may contain only letters, digits, '.', '_' and '-'.")
+    if db.get_model(alias) is not None:
+        raise _admin_error(status.HTTP_409_CONFLICT, f"Model '{alias}' already exists.")
+    row = db.upsert_model(
+        alias,
+        upstream_model,  # doubles as ollama_tag (NOT NULL); never sent to Ollama
+        (body.display_name or alias).strip(),
+        role="chat",
+        state="running",
+        provider=name,
+        upstream_model=upstream_model,
+    )
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=row)
 
 
 # --------------------------------------------------------------------------- #

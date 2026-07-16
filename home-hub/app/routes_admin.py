@@ -163,6 +163,53 @@ async def ollama_installed(device=Depends(_admin)):
 
 
 # ---------------------------------------------------------------------------
+# Cloud providers (BYO-key Anthropic/OpenAI) — thin admin-gated proxy to the
+# gateway. Provider API keys are WRITE-ONLY: the gateway stores them encrypted
+# and only ever returns a masked hint, never the key itself.
+# ---------------------------------------------------------------------------
+@router.get("/providers")
+async def list_providers(device=Depends(_admin)):
+    return await integration.gateway_admin_json("GET", "/admin/providers")
+
+
+@router.put("/providers/{name}/key")
+async def set_provider_key(name: str, payload: dict = Body(default={}), device=Depends(_admin)):
+    return await integration.gateway_admin_json(
+        "PUT", f"/admin/providers/{name}/key", json=payload)
+
+
+@router.post("/providers/{name}/enable")
+async def enable_provider(name: str, payload: dict = Body(default={}), device=Depends(_admin)):
+    return await integration.gateway_admin_json(
+        "POST", f"/admin/providers/{name}/enable", json=payload)
+
+
+@router.put("/providers/{name}/budget")
+async def set_provider_budget(name: str, payload: dict = Body(default={}), device=Depends(_admin)):
+    return await integration.gateway_admin_json(
+        "PUT", f"/admin/providers/{name}/budget", json=payload)
+
+
+@router.post("/providers/{name}/models")
+async def add_cloud_model(name: str, payload: dict = Body(default={}), device=Depends(_admin)):
+    return await integration.gateway_admin_json(
+        "POST", f"/admin/providers/{name}/models", json=payload)
+
+
+@router.get("/gateway-keys")
+async def gateway_keys(device=Depends(_admin)):
+    """All gateway API keys (no secret material) — the UI reads cloud_allowed."""
+    return await integration.gateway_admin_json("GET", "/admin/keys")
+
+
+@router.post("/gateway-keys/{key_id}/cloud")
+async def set_gateway_key_cloud(key_id: str, payload: dict = Body(default={}),
+                                device=Depends(_admin)):
+    return await integration.gateway_admin_json(
+        "POST", f"/admin/keys/{key_id}/cloud", json=payload)
+
+
+# ---------------------------------------------------------------------------
 # Voice models (STT/TTS) — proxied to the voice service's control plane.
 # ---------------------------------------------------------------------------
 @router.get("/voice-models")

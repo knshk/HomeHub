@@ -24,6 +24,8 @@ const State = {
   status: { chat: true, vision: true, voice: true, images: false, images_url: '' },
   statusPoll: null,
   imgSelected: new Set(),   // selected image filenames in the Images ribbon
+  chatModels: [],           // chat-capable gateway models for the composer picker (admins)
+  convModel: {},            // conv id -> chosen model alias ('' = house default); memory only
 };
 
 /* ===========================================================================
@@ -311,6 +313,7 @@ function wireGlobalUI() {
   wireVoice();
   wireNotes();
   wireChecklists();
+  wireCalendar();
   wireFiles();
   wireKeys();
   wireAdmin();
@@ -588,6 +591,9 @@ function tabAllowed(tab) {
   if (tab === 'studio') return can('files_write');
   // files tab needs files_read OR photos_read
   if (tab === 'files') return can('files_read') || can('photos_read');
+  // Calendar reads are open to any approved device; its data-priv
+  // ('checklists' — household content shares one grant) only gates writes.
+  if (tab === 'calendar') return !!(State.me && State.me.status === 'approved');
   return can(btn.dataset.priv);
 }
 
@@ -658,6 +664,7 @@ function selectTab(tab) {
     case 'chat':       loadConversations(); break;
     case 'notes':      loadNotes(); break;
     case 'checklists': loadChecklists(); break;
+    case 'calendar':   loadCalendar(); break;
     case 'files':      loadFiles(); break;
     case 'keys':       loadKeys(); break;
     case 'admin':      loadDevices(); break;
@@ -984,10 +991,61 @@ function wireChat() {
 
   $('#chat-form').addEventListener('submit', (e) => { e.preventDefault(); sendMessage(); });
   $('#chat-stop').addEventListener('click', () => { if (State.chatAbort) State.chatAbort.abort(); });
+
+  // Model picker (admins): remember the choice per conversation, memory only.
+  $('#chat-model').addEventListener('change', () => {
+    if (State.activeConvId) State.convModel[State.activeConvId] = $('#chat-model').value;
+    updateCloudNotice();
+  });
+}
+
+/* ---- composer model picker (admins only — the catalog is admin-gated) ---- */
+const PROVIDER_LABEL = { anthropic: 'Anthropic', openai: 'OpenAI' };
+const isCloudModel = (m) => !!(m && m.provider && m.provider !== 'local');
+
+async function loadChatModels() {
+  if (!isAdmin()) return;
+  try {
+    const cat = await api('/api/admin/models-catalog');
+    State.chatModels = ((cat && cat.llm) || []).filter((m) => m.role === 'chat');
+  } catch (e) { State.chatModels = []; }
+  renderChatModelSelect();
+}
+
+function renderChatModelSelect() {
+  const bar = $('#chat-model-bar');
+  const sel = $('#chat-model');
+  if (!bar || !sel) return;
+  if (!isAdmin() || !State.chatModels.length) { bar.hidden = true; return; }
+  const current = State.convModel[State.activeConvId] || '';
+  sel.innerHTML = '';
+  sel.append(el('option', { value: '' }, 'House default'));
+  for (const m of State.chatModels) {
+    const label = isCloudModel(m)
+      ? `${m.display_name || m.alias} · cloud ↗`
+      : (m.display_name || m.alias);
+    sel.append(el('option', { value: m.alias, selected: m.alias === current }, label));
+  }
+  bar.hidden = false;
+  updateCloudNotice();
+}
+
+function updateCloudNotice() {
+  const note = $('#chat-cloud-notice');
+  if (!note) return;
+  const m = State.chatModels.find((x) => x.alias === $('#chat-model')?.value);
+  if (m && isCloudModel(m)) {
+    note.textContent = `This conversation is sent to ${PROVIDER_LABEL[m.provider] || m.provider} outside your home.`;
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+    note.textContent = '';
+  }
 }
 
 async function loadConversations() {
   if (!can('chat')) return;
+  loadChatModels();   // non-blocking; hides the picker for non-admins
   try {
     State.conversations = await api('/api/conversations') || [];
   } catch (e) { toast(e.message, 'error'); State.conversations = []; }
@@ -1038,6 +1096,9 @@ async function deleteConversation(id) {
 async function openConversation(id) {
   State.activeConvId = id;
   renderConversationList();
+  // Restore this conversation's model choice (memory only; '' = default).
+  const sel = $('#chat-model');
+  if (sel && !$('#chat-model-bar').hidden) { sel.value = State.convModel[id] || ''; updateCloudNotice(); }
   const wrap = $('#chat-messages');
   wrap.innerHTML = '<div class="empty-hint">Loading…</div>';
   try {
@@ -1080,12 +1141,16 @@ async function sendMessage() {
   const content = input.value.trim();
   if (!content) return;
 
+  // Model override (admins; '' = house default rides as "absent").
+  const model = ($('#chat-model-bar').hidden ? '' : $('#chat-model').value) || '';
+
   if (!State.activeConvId) {
     // auto-create a conversation
     try {
       const conv = await api('/api/conversations', { method: 'POST', body: { title: content.slice(0, 40) } });
       State.conversations.unshift(conv);
       State.activeConvId = conv.id;
+      if (model) State.convModel[conv.id] = model;
       $('#chat-messages').innerHTML = '';
       renderConversationList();
     } catch (e) { toast(e.message, 'error'); return; }
@@ -1112,7 +1177,7 @@ async function sendMessage() {
   try {
     const res = await api(`/api/conversations/${State.activeConvId}/messages`, {
       method: 'POST',
-      body: { content, stream: true },
+      body: model ? { content, stream: true, model } : { content, stream: true },
       raw: true,
       signal: ctrl.signal,
     });
@@ -1684,6 +1749,357 @@ async function onChecklistChange(e) {
 }
 
 /* ===========================================================================
+ * CALENDAR & CHORES
+ * ---------------------------------------------------------------------------
+ * Reads are open to any approved device; writes need the 'checklists'
+ * privilege (the server enforces this — the UI just hides write affordances).
+ * Recurring events arrive pre-expanded from the server, so an occurrence's
+ * `id` is its anchor event's id: editing/deleting touches the whole series.
+ * ========================================================================= */
+let CAL_EVENTS = [];    // occurrences in the visible month
+let CAL_UPCOMING = [];  // occurrences in the next 14 days
+let CHORES = [];
+let CAL_YEAR = null, CAL_MONTH = null;  // visible month (1-12); set on first load
+
+const CAL_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+const CAL_RECURRENCES = [['', 'Does not repeat'], ['daily', 'Daily'],
+  ['weekly', 'Weekly'], ['monthly', 'Monthly'], ['yearly', 'Yearly']];
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+/** 'YYYY-MM-DD' -> local Date (avoids the UTC shift of new Date(string)). */
+function calDate(s) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Short human date for lists/toasts, e.g. "Fri, Jul 17". */
+function fmtDay(s) {
+  return calDate(s).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** Stable person -> chip color class (cal-p0..cal-p5). */
+function personClass(name) {
+  let h = 0;
+  for (const c of String(name || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `cal-p${h % 6}`;
+}
+
+function calCanWrite() { return can('checklists'); }
+
+function wireCalendar() {
+  $('#cal-add-event').addEventListener('click', () => openEventEditor(null));
+  $('#chore-add').addEventListener('click', openChoreEditor);
+  $('#cal-month').addEventListener('click', onCalMonthClick);
+  $('#cal-upcoming').addEventListener('click', onCalUpcomingClick);
+  $('#chores-list').addEventListener('click', onChoresClick);
+}
+
+async function loadCalendar() {
+  if (!State.me || State.me.status !== 'approved') return;
+  if (CAL_YEAR == null) {
+    const now = new Date();
+    CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1;
+  }
+  // show/hide write buttons depending on privilege (server still enforces)
+  $('#cal-add-event').hidden = !calCanWrite();
+  $('#chore-add').hidden = !calCanWrite();
+
+  const first = `${CAL_YEAR}-${pad2(CAL_MONTH)}-01`;
+  const last = `${CAL_YEAR}-${pad2(CAL_MONTH)}-${pad2(new Date(CAL_YEAR, CAL_MONTH, 0).getDate())}`;
+  const today = new Date();
+  const horizon = new Date(today); horizon.setDate(horizon.getDate() + 13);  // 14 days incl. today
+  try {
+    const [evs, up, chores] = await Promise.all([
+      api(`/api/calendar/events?start=${first}&end=${last}`),
+      api(`/api/calendar/events?start=${ymd(today)}&end=${ymd(horizon)}`),
+      api('/api/calendar/chores'),
+    ]);
+    CAL_EVENTS = evs || []; CAL_UPCOMING = up || []; CHORES = chores || [];
+  } catch (e) {
+    toast(e.message, 'error');
+    CAL_EVENTS = []; CAL_UPCOMING = []; CHORES = [];
+  }
+  renderCalMonth();
+  renderCalUpcoming();
+  renderChores();
+}
+
+/* ---- month grid ---- */
+function calChip(ev, { withTime = true } = {}) {
+  const label = (withTime && ev.time ? `${ev.time} ` : '') + (ev.title || '');
+  const tip = [ev.time, ev.title, ev.person && `— ${ev.person}`, ev.recurrence && `(${ev.recurrence})`,
+    ev.notes].filter(Boolean).join(' ');
+  return el('button', {
+    type: 'button',
+    class: `cal-chip ${personClass(ev.person)}`,
+    title: tip,
+    dataset: { evId: ev.id },
+  }, label);
+}
+
+function renderCalMonth() {
+  const wrap = $('#cal-month');
+  wrap.innerHTML = '';
+
+  const byDate = new Map();
+  for (const ev of CAL_EVENTS) {
+    if (!byDate.has(ev.date)) byDate.set(ev.date, []);
+    byDate.get(ev.date).push(ev);
+  }
+
+  const nav = el('div', { class: 'cal-nav' },
+    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: 'Previous month', dataset: { calNav: '-1' } }, '←'),
+    el('strong', { class: 'cal-nav-title' }, `${CAL_MONTHS[CAL_MONTH - 1]} ${CAL_YEAR}`),
+    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: 'Next month', dataset: { calNav: '1' } }, '→'),
+    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', dataset: { calToday: '1' } }, 'Today'),
+  );
+
+  const grid = el('div', { class: 'cal-grid' });
+  for (const wd of CAL_WEEKDAYS) grid.append(el('div', { class: 'cal-wd' }, wd));
+  const firstDow = new Date(CAL_YEAR, CAL_MONTH - 1, 1).getDay();
+  const daysInMonth = new Date(CAL_YEAR, CAL_MONTH, 0).getDate();
+  const todayStr = ymd(new Date());
+  for (let i = 0; i < firstDow; i++) grid.append(el('div', { class: 'cal-day cal-pad' }));
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${CAL_YEAR}-${pad2(CAL_MONTH)}-${pad2(d)}`;
+    const cell = el('div', {
+      class: 'cal-day' + (dateStr === todayStr ? ' cal-today' : ''),
+      dataset: { calDate: dateStr },
+      title: calCanWrite() ? 'Click to add an event' : null,
+    },
+      el('span', { class: 'cal-daynum' }, d),
+      el('span', { class: 'cal-dayname' }, CAL_WEEKDAYS[new Date(CAL_YEAR, CAL_MONTH - 1, d).getDay()]),
+    );
+    for (const ev of (byDate.get(dateStr) || [])) cell.append(calChip(ev));
+    grid.append(cell);
+  }
+  wrap.append(nav, grid);
+}
+
+function onCalMonthClick(e) {
+  const nav = e.target.closest('[data-cal-nav]');
+  if (nav) {
+    CAL_MONTH += Number(nav.dataset.calNav);
+    if (CAL_MONTH < 1) { CAL_MONTH = 12; CAL_YEAR -= 1; }
+    if (CAL_MONTH > 12) { CAL_MONTH = 1; CAL_YEAR += 1; }
+    loadCalendar();
+    return;
+  }
+  if (e.target.closest('[data-cal-today]')) {
+    const now = new Date();
+    CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1;
+    loadCalendar();
+    return;
+  }
+  if (!calCanWrite()) return;
+  const chip = e.target.closest('.cal-chip');
+  if (chip) { openEventEditor(chip.dataset.evId); return; }
+  const day = e.target.closest('.cal-day[data-cal-date]');
+  if (day) openEventEditor(null, day.dataset.calDate);
+}
+
+/* ---- upcoming (14 days) ---- */
+function renderCalUpcoming() {
+  const wrap = $('#cal-upcoming');
+  wrap.innerHTML = '';
+  if (!CAL_UPCOMING.length) {
+    wrap.append(el('div', { class: 'empty-hint' }, 'Nothing on the calendar for the next two weeks.'));
+    return;
+  }
+  for (const ev of CAL_UPCOMING) {
+    wrap.append(el('button', { type: 'button', class: 'cal-up-row', title: ev.notes || null, dataset: { evId: ev.id } },
+      el('span', { class: 'cal-up-date' }, fmtDay(ev.date)),
+      el('span', { class: 'cal-up-time' }, ev.time || 'all day'),
+      el('span', { class: 'cal-up-title' }, ev.title || ''),
+      ev.person ? el('span', { class: `cal-chip cal-up-person ${personClass(ev.person)}` }, ev.person) : null,
+      ev.recurrence ? el('span', { class: 'cal-up-recur muted' }, `↻ ${ev.recurrence}`) : null,
+    ));
+  }
+}
+
+function onCalUpcomingClick(e) {
+  const row = e.target.closest('.cal-up-row');
+  if (row && calCanWrite()) openEventEditor(row.dataset.evId);
+}
+
+/* ---- event editor modal (create + edit + delete) ---- */
+function openEventEditor(id, presetDate) {
+  const ev = id
+    ? CAL_EVENTS.concat(CAL_UPCOMING).find((x) => String(x.id) === String(id)) || null
+    : null;
+  const titleInput = el('input', { class: 'field', type: 'text', placeholder: 'e.g. Dentist, football practice',
+    maxlength: 200, required: true, value: ev ? ev.title || '' : '' });
+  const dateInput = el('input', { class: 'field', type: 'date', required: true,
+    value: ev ? ev.date : (presetDate || ymd(new Date())) });
+  const timeInput = el('input', { class: 'field', type: 'time', value: (ev && ev.time) || '' });
+  const personInput = el('input', { class: 'field', type: 'text', placeholder: 'Who is it for? (optional)',
+    maxlength: 80, value: ev ? ev.person || '' : '' });
+  const recurSelect = el('select', { class: 'field' },
+    ...CAL_RECURRENCES.map(([v, label]) =>
+      el('option', { value: v, selected: !!(ev && ev.recurrence === v) }, label)));
+  const notesInput = el('textarea', { class: 'field', rows: 3, placeholder: 'Notes (optional)' },
+    ev ? ev.notes || '' : '');
+
+  const form = el('form', { class: 'cal-editor' },
+    el('h3', {}, id ? 'Edit event' : 'New event'),
+    ev && ev.recurrence
+      ? el('p', { class: 'muted cal-series-note' }, 'This event repeats — changes apply to the whole series.')
+      : null,
+    el('label', { class: 'field-label' }, 'Title'), titleInput,
+    el('label', { class: 'field-label' }, 'Date'), dateInput,
+    el('label', { class: 'field-label' }, 'Time'), timeInput,
+    el('label', { class: 'field-label' }, 'Person'), personInput,
+    el('label', { class: 'field-label' }, 'Repeats'), recurSelect,
+    el('label', { class: 'field-label' }, 'Notes'), notesInput,
+    el('div', { class: 'modal-actions' },
+      id ? el('button', { type: 'button', class: 'btn btn-ghost danger',
+        onclick: () => deleteCalEvent(id, !!(ev && ev.recurrence)) }, 'Delete') : null,
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: closeModal }, 'Cancel'),
+      el('button', { type: 'submit', class: 'btn btn-primary' }, id ? 'Save' : 'Create'),
+    ),
+  );
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      title: titleInput.value.trim(),
+      date: dateInput.value,
+      time: timeInput.value || null,
+      person: personInput.value.trim() || null,
+      recurrence: recurSelect.value || null,
+      notes: notesInput.value.trim() || null,
+    };
+    // A recurring event's editor shows ONE occurrence's date; writing it back
+    // unchanged would silently re-anchor the whole series to that occurrence
+    // (dropping earlier repeats and any month-end anchor day). Only send the
+    // date when the user actually changed it.
+    if (ev && ev.recurrence && payload.date === ev.date) delete payload.date;
+    try {
+      if (id) await api(`/api/calendar/events/${id}`, { method: 'PUT', body: payload });
+      else await api('/api/calendar/events', { method: 'POST', body: payload });
+      closeModal();
+      loadCalendar();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+
+  openModal(form);
+  titleInput.focus();
+}
+
+async function deleteCalEvent(id, isSeries) {
+  if (!confirm(isSeries ? 'Delete this event and all its repeats?' : 'Delete this event?')) return;
+  try {
+    await api(`/api/calendar/events/${id}`, { method: 'DELETE' });
+    closeModal();
+    loadCalendar();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ---- chores ---- */
+function renderChores() {
+  const wrap = $('#chores-list');
+  wrap.innerHTML = '';
+  $('#chores-empty').hidden = CHORES.length > 0;
+  const todayStr = ymd(new Date());
+  for (const ch of CHORES) {
+    const overdue = !!(ch.due_date && ch.due_date < todayStr);
+    const sub = [
+      ch.assignee || null,
+      ch.cadence !== 'once' ? ch.cadence : null,
+      ch.due_date ? `due ${fmtDay(ch.due_date)}${overdue ? ' — overdue' : ''}` : 'no due date',
+      ch.rotation ? `rotates ${ch.rotation.join(' → ')}` : null,
+    ].filter(Boolean).join(' · ');
+    wrap.append(el('div', { class: 'chore-row' + (overdue ? ' overdue' : ''), dataset: { choreId: ch.id } },
+      el('div', { class: 'chore-main' },
+        el('strong', { class: 'chore-title' }, ch.title || ''),
+        el('span', { class: 'chore-sub' }, sub),
+      ),
+      calCanWrite() ? el('div', { class: 'chore-actions' },
+        el('button', { type: 'button', class: 'btn btn-primary btn-sm', dataset: { choreDone: '1' } }, 'Complete'),
+        el('button', { type: 'button', class: 'btn-link danger', dataset: { choreDel: '1' } }, 'Delete'),
+      ) : null,
+    ));
+  }
+}
+
+async function onChoresClick(e) {
+  const row = e.target.closest('.chore-row');
+  if (!row) return;
+  const id = row.dataset.choreId;
+
+  if (e.target.closest('[data-chore-done]')) {
+    const before = CHORES.find((c) => String(c.id) === String(id));
+    try {
+      const after = await api(`/api/calendar/chores/${id}/complete`, { method: 'POST' });
+      if (after.done_at) {
+        toast('Chore done — nice work!', 'success');
+      } else if (before && after.assignee && after.assignee !== before.assignee) {
+        // recurring chore handed off through the rotation
+        toast(`Done! Next up: ${after.assignee}${after.due_date ? ` (due ${fmtDay(after.due_date)})` : ''}`, 'success');
+      } else {
+        toast(`Done!${after.due_date ? ` Due again ${fmtDay(after.due_date)}.` : ''}`, 'success');
+      }
+      loadCalendar();
+    } catch (err) { toast(err.message, 'error'); }
+    return;
+  }
+
+  if (e.target.closest('[data-chore-del]')) {
+    if (!confirm('Delete this chore?')) return;
+    try { await api(`/api/calendar/chores/${id}`, { method: 'DELETE' }); loadCalendar(); }
+    catch (err) { toast(err.message, 'error'); }
+  }
+}
+
+function openChoreEditor() {
+  const titleInput = el('input', { class: 'field', type: 'text', placeholder: 'e.g. Take out the bins',
+    maxlength: 200, required: true });
+  const assigneeInput = el('input', { class: 'field', type: 'text',
+    placeholder: 'e.g. Alex  —  or  Alex, Sam, Kai to rotate' });
+  const cadenceSelect = el('select', { class: 'field' },
+    el('option', { value: 'once' }, 'Once'),
+    el('option', { value: 'daily' }, 'Daily'),
+    el('option', { value: 'weekly' }, 'Weekly'));
+  const dueInput = el('input', { class: 'field', type: 'date' });
+
+  const form = el('form', { class: 'cal-editor' },
+    el('h3', {}, 'New chore'),
+    el('label', { class: 'field-label' }, 'Title'), titleInput,
+    el('label', { class: 'field-label' }, 'Assignee(s) — comma-separated names take turns'), assigneeInput,
+    el('label', { class: 'field-label' }, 'Repeats'), cadenceSelect,
+    el('label', { class: 'field-label' }, 'Due date'), dueInput,
+    el('div', { class: 'modal-actions' },
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: closeModal }, 'Cancel'),
+      el('button', { type: 'submit', class: 'btn btn-primary' }, 'Create'),
+    ),
+  );
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const names = assigneeInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+    const payload = {
+      title: titleInput.value.trim(),
+      assignee: names[0] || null,
+      rotation: names.length > 1 ? names : null,   // >1 name -> rotation hand-off
+      cadence: cadenceSelect.value,
+      due_date: dueInput.value || null,
+    };
+    try {
+      await api('/api/calendar/chores', { method: 'POST', body: payload });
+      closeModal();
+      loadCalendar();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+
+  openModal(form);
+  titleInput.focus();
+}
+
+/* ===========================================================================
  * FILES & PHOTOS
  * ========================================================================= */
 function wireFiles() {
@@ -1910,12 +2326,41 @@ function wireKeys() {
 }
 
 let KEYS = [];
+let GW_KEY_CLOUD = null;   // gateway key id -> cloud_allowed (admins; null = unknown)
 
 async function loadKeys() {
   if (!can('api_keys')) return;
   try { KEYS = await api('/api/keys') || []; }
   catch (e) { toast(e.message, 'error'); KEYS = []; }
+  // Admins also see + toggle each key's cloud opt-in (state lives gateway-side).
+  GW_KEY_CLOUD = null;
+  if (isAdmin()) {
+    try {
+      const d = await api('/api/admin/gateway-keys');
+      GW_KEY_CLOUD = {};
+      for (const gk of (d && d.keys) || []) GW_KEY_CLOUD[String(gk.id)] = !!gk.cloud_allowed;
+    } catch (e) { /* gateway down — hide the toggles */ }
+  }
   renderKeys();
+}
+
+function cloudToggle(k) {
+  // Admin-only switch: may this key use cloud models? (opt-in, per key)
+  const gid = String(k.gateway_key_id);
+  const cb = el('input', { type: 'checkbox', checked: !!GW_KEY_CLOUD[gid] });
+  cb.addEventListener('change', async () => {
+    cb.disabled = true;
+    try {
+      await api(`/api/admin/gateway-keys/${encodeURIComponent(gid)}/cloud`, {
+        method: 'POST', body: { allowed: cb.checked },
+      });
+      GW_KEY_CLOUD[gid] = cb.checked;
+      toast(cb.checked ? 'Cloud models allowed for this key' : 'Cloud models blocked for this key', 'success');
+    } catch (e) { toast(e.message, 'error'); cb.checked = !cb.checked; }
+    cb.disabled = false;
+  });
+  return el('label', { class: 'switch key-cloud-toggle', title: 'Allow this key to use cloud models (chats leave your home)' },
+    cb, el('span', { class: 'track' }), el('span', {}, 'Cloud'));
 }
 
 function renderKeys() {
@@ -1924,6 +2369,7 @@ function renderKeys() {
   $('#keys-empty').hidden = KEYS.length > 0;
   for (const k of KEYS) {
     const revoked = !!k.revoked;
+    const canCloud = !revoked && GW_KEY_CLOUD && String(k.gateway_key_id) in GW_KEY_CLOUD;
     wrap.append(el('div', { class: 'key-row' + (revoked ? ' revoked' : ''), dataset: { keyId: k.id } },
       el('div', { class: 'key-main' },
         el('div', { class: 'key-name' }, k.name || 'key'),
@@ -1933,6 +2379,7 @@ function renderKeys() {
           revoked ? el('span', { class: 'tag tag-pending' }, 'revoked') : null,
         ),
       ),
+      canCloud ? cloudToggle(k) : null,
       revoked ? null : el('button', { class: 'btn btn-ghost btn-sm', dataset: { keyRevoke: '1' } }, 'Revoke'),
     ));
   }
@@ -2173,11 +2620,12 @@ async function refreshModels() {
   // models-catalog always returns the AI models (live when up, last-known when
   // stopped) so the page lists them even when the stack is off. All fetches are
   // fault-tolerant so nothing ever blanks the page.
-  let svc = null, cat = null, img = null, res = null;
+  let svc = null, cat = null, img = null, res = null, prov = null;
   try { svc = await api('/api/admin/services'); } catch (e) { /* rare */ }
   try { cat = await api('/api/admin/models-catalog'); } catch (e) { cat = null; }
   try { img = await api('/api/admin/image-models'); } catch (e) { img = null; }
   try { res = await api('/api/admin/resources-overview'); } catch (e) { res = null; }
+  try { prov = await api('/api/admin/providers'); } catch (e) { prov = null; }  // gateway down → hidden
   // Which ollama tags are actually downloaded — a model is only Start-able once its
   // weights are on disk. (Registered-but-not-downloaded shows as "downloading".)
   if (cat && cat.gw_up) {
@@ -2198,7 +2646,7 @@ async function refreshModels() {
   // every 5s poll. Keep the full `cat` for renderModels().
   const catSig = cat ? {
     gw_up: cat.gw_up, voice_up: cat.voice_up,
-    llm: (cat.llm || []).map((m) => ({ alias: m.alias, role: m.role, state: m.state, loaded: m.loaded, display_name: m.display_name, ollama_tag: m.ollama_tag, dl: llmDownloaded(m), pull: llmPulling(m) })),
+    llm: (cat.llm || []).map((m) => ({ alias: m.alias, role: m.role, state: m.state, loaded: m.loaded, display_name: m.display_name, ollama_tag: m.ollama_tag, provider: m.provider, dl: llmDownloaded(m), pull: llmPulling(m) })),
     voice: (cat.voice || []).map((m) => ({ name: m.name, role: m.role, state: m.state, loaded: m.loaded, display_name: m.display_name })),
   } : null;
   const structSig = JSON.stringify({
@@ -2207,10 +2655,12 @@ async function refreshModels() {
     cat: catSig,
     imgIds: img && img.models ? img.models.filter((m) => m.cached).map((m) => m.id) : [],
     disk: { ai: aiDisk, img: imgDisk },
+    prov: prov && prov.providers ? prov.providers : null,
   });
   if (structSig !== _modelsSig) {
     _modelsSig = structSig;
     renderModels(cat, img, res);
+    renderProviders(prov);
   }
 }
 
@@ -2297,13 +2747,16 @@ function renderModels(cat, img, res) {
   const dk = (map, key) => (map && map[key] ? map[key].disk_bytes : null);
 
   // AI models (the 5) — always listed. `offline` cards show a Start button.
+  // Cloud models (provider != local) have no local weights: no disk/RAM stats,
+  // never "not downloaded", and a 'cloud' badge instead.
   const aiGrid = el('div', { class: 'models-grid' });
-  llm.forEach((m) => aiGrid.append(modelCard({
-    ...m, source: 'gateway', key: m.alias, removable: true, subtitle: m.ollama_tag,
+  llm.forEach((m) => { const cloud = isCloudModel(m); aiGrid.append(modelCard({
+    ...m, source: 'gateway', key: m.alias, removable: true, cloud,
+    subtitle: cloud ? `${m.provider} · ${m.upstream_model || m.ollama_tag}` : m.ollama_tag,
     tokens_24h: (m.prompt_tokens_24h || 0) + (m.completion_tokens_24h || 0),
-    has_tokens: m.role !== 'embed', offline: !gwUp, disk_bytes: dk(aiDisk, m.alias),
-    downloaded: gwUp ? llmDownloaded(m) : true, pulling: llmPulling(m),
-  })));
+    has_tokens: m.role !== 'embed', offline: !gwUp, disk_bytes: cloud ? null : dk(aiDisk, m.alias),
+    downloaded: cloud || (gwUp ? llmDownloaded(m) : true), pulling: !cloud && llmPulling(m),
+  })); });
   voice.forEach((m) => aiGrid.append(modelCard({
     ...m, source: 'voice', key: m.name, removable: false, subtitle: 'voice service',
     has_tokens: false, offline: !voiceUp, disk_bytes: dk(aiDisk, m.name),
@@ -2368,11 +2821,12 @@ function modelCard(m) {
           el('strong', {}, m.display_name || m.key),
           el('span', { class: 'model-alias mono' }, m.key)),
         el('div', { class: 'model-head-right' },
+          m.cloud ? el('span', { class: 'role-badge role-cloud' }, 'cloud') : null,
           el('span', { class: `role-badge role-${m.role}` }, ROLE_LABEL[m.role] || m.role),
           el('span', { class: 'state-pill state-stopped' }, el('span', { class: 'state-dot' }), 'stopped')),
       ),
       el('div', { class: 'model-tag mono muted' }, m.subtitle || ''),
-      el('div', { class: 'model-stats' }, mstat(fmtBytes(m.disk_bytes || 0), 'disk')),
+      m.cloud ? null : el('div', { class: 'model-stats' }, mstat(fmtBytes(m.disk_bytes || 0), 'disk')),
       el('div', { class: 'model-actions' },
         el('button', { class: 'btn btn-sm btn-primary', dataset: { startAi: '1' } }, 'Start'),
         el('span', { class: 'model-offline-hint muted' }, 'starts the AI models'),
@@ -2403,9 +2857,10 @@ function modelCard(m) {
   if (m.removable) actions.append(el('button', { class: 'btn btn-sm btn-ghost danger', dataset: { modelRemove: '1', key: m.key } }, 'Remove'));
 
   // Disk always; RAM (in memory), requests, tokens only when non-zero.
+  // Cloud models run elsewhere — no disk/RAM stats, usage counters only.
   const stats = el('div', { class: 'model-stats' });
-  if (m.disk_bytes != null) stats.append(mstat(fmtBytes(m.disk_bytes), 'disk'));
-  if (m.loaded) stats.append(mstat(m.resident_bytes ? fmtBytes(m.resident_bytes) : 'yes', 'in memory', 'ok'));
+  if (!m.cloud && m.disk_bytes != null) stats.append(mstat(fmtBytes(m.disk_bytes), 'disk'));
+  if (!m.cloud && m.loaded) stats.append(mstat(m.resident_bytes ? fmtBytes(m.resident_bytes) : 'yes', 'in memory', 'ok'));
   if (m.requests_24h) stats.append(mstat(String(m.requests_24h), 'requests 24h'));
   if (m.has_tokens && m.tokens_24h) stats.append(mstat(fmtNum(m.tokens_24h), 'tokens 24h'));
 
@@ -2416,6 +2871,7 @@ function modelCard(m) {
         el('span', { class: 'model-alias mono' }, m.key),
       ),
       el('div', { class: 'model-head-right' },
+        m.cloud ? el('span', { class: 'role-badge role-cloud' }, 'cloud') : null,
         el('span', { class: `role-badge role-${m.role}` }, ROLE_LABEL[m.role] || m.role),
         el('span', { class: `state-pill state-${dispState}` }, el('span', { class: 'state-dot' }), dispLabel),
       ),
@@ -2487,6 +2943,163 @@ async function removeModel(alias) {
     _modelsSig = '';
     await refreshModels();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ===========================================================================
+ * CLOUD PROVIDERS (admin) — BYO-key Anthropic/OpenAI via the gateway.
+ * Keys are write-only: set here, never displayed back (masked hint only).
+ * ========================================================================= */
+const CLOUD_MODEL_PLACEHOLDER = { anthropic: 'claude-opus-4-8', openai: 'gpt-4o' };
+const CLOUD_KEY_PLACEHOLDER = { anthropic: 'sk-ant-…', openai: 'sk-…' };
+
+function renderProviders(prov) {
+  const wrap = $('#providers-section');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!prov || !Array.isArray(prov.providers) || !prov.providers.length) return; // gateway down
+  wrap.append(el('div', { class: 'model-subhead muted' }, 'Cloud providers'));
+  wrap.append(el('p', { class: 'muted providers-hint' },
+    'Bring your own API key. Cloud chats leave your home — models are visible only to admins, and API keys need a per-key opt-in on the Keys page.'));
+  const grid = el('div', { class: 'providers-grid' });
+  prov.providers.forEach((p) => grid.append(providerCard(p)));
+  wrap.append(grid);
+}
+
+function providerCard(p) {
+  const budgetInput = el('input', {
+    class: 'field', type: 'number', min: '0', step: '1000',
+    value: String(p.monthly_token_budget || 0), title: 'Monthly token budget (0 = unlimited)',
+  });
+  const usage = p.monthly_token_budget
+    ? `${fmtNum(p.month_usage_tokens || 0)} of ${fmtNum(p.monthly_token_budget)} tokens this month`
+    : `${fmtNum(p.month_usage_tokens || 0)} tokens this month · no budget cap`;
+
+  return el('div', { class: `svc-card provider-card ${p.enabled ? 'on' : 'off'}` },
+    el('div', { class: 'svc-head' },
+      el('span', { class: `svc-dot ${p.enabled ? 'on' : 'off'}` }),
+      el('strong', {}, PROVIDER_LABEL[p.name] || p.name),
+      el('span', { class: 'role-badge role-cloud' }, 'cloud'),
+    ),
+    el('div', { class: 'svc-status muted' },
+      p.has_key ? el('span', {}, 'key ', el('code', { class: 'mono' }, p.key_hint || '••••')) : 'no API key set',
+      ` · ${p.enabled ? 'enabled' : 'disabled'}`,
+    ),
+    el('div', { class: 'provider-usage muted' }, usage),
+    el('div', { class: 'provider-budget-row' },
+      el('label', { class: 'field-label' }, 'Budget'),
+      budgetInput,
+      el('button', {
+        class: 'btn btn-sm btn-ghost', type: 'button',
+        onclick: () => saveProviderBudget(p.name, budgetInput.value),
+      }, 'Save'),
+    ),
+    el('div', { class: 'svc-actions' },
+      el('button', {
+        class: 'btn btn-sm btn-ghost', type: 'button',
+        onclick: () => openProviderKeyDialog(p),
+      }, p.has_key ? 'Replace API key' : 'Set API key'),
+      el('button', {
+        class: `btn btn-sm ${p.enabled ? 'btn-ghost' : 'btn-primary'}`, type: 'button',
+        onclick: () => toggleProvider(p),
+      }, p.enabled ? 'Disable' : 'Enable'),
+      p.enabled && p.has_key ? el('button', {
+        class: 'btn btn-sm btn-ghost', type: 'button',
+        onclick: () => openAddCloudModelDialog(p),
+      }, 'Add cloud model') : null,
+    ),
+  );
+}
+
+function openProviderKeyDialog(p) {
+  const input = el('input', {
+    class: 'field', type: 'password', autocomplete: 'off',
+    placeholder: CLOUD_KEY_PLACEHOLDER[p.name] || 'API key', required: true,
+  });
+  const form = el('form', { class: 'add-model-form' },
+    el('h3', {}, `${PROVIDER_LABEL[p.name] || p.name} API key`),
+    el('p', { class: 'muted' },
+      'Stored encrypted on the gateway and never shown again — only a masked hint.'),
+    el('label', { class: 'field-label' }, 'API key'),
+    input,
+    el('div', { class: 'modal-actions' },
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: closeModal }, 'Cancel'),
+      el('button', { type: 'submit', class: 'btn btn-primary' }, 'Save key'),
+    ),
+  );
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const api_key = input.value.trim();
+    if (!api_key) return;
+    try {
+      await api(`/api/admin/providers/${encodeURIComponent(p.name)}/key`, { method: 'PUT', body: { api_key } });
+      closeModal();
+      toast('API key saved', 'success');
+      _modelsSig = ''; refreshModels();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+  openModal(form);
+  input.focus();
+}
+
+async function toggleProvider(p) {
+  const enabled = !p.enabled;
+  if (enabled && !p.has_key) return toast('Set an API key first', 'error');
+  try {
+    await api(`/api/admin/providers/${encodeURIComponent(p.name)}/enable`, { method: 'POST', body: { enabled } });
+    toast(`${PROVIDER_LABEL[p.name] || p.name} ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    _modelsSig = ''; refreshModels();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function saveProviderBudget(name, value) {
+  const monthly_token_budget = Math.max(0, Math.floor(Number(value) || 0));
+  try {
+    await api(`/api/admin/providers/${encodeURIComponent(name)}/budget`, { method: 'PUT', body: { monthly_token_budget } });
+    toast(monthly_token_budget ? `Budget set: ${fmtNum(monthly_token_budget)} tokens/month` : 'Budget removed (unlimited)', 'success');
+    _modelsSig = ''; refreshModels();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function openAddCloudModelDialog(p) {
+  const example = CLOUD_MODEL_PLACEHOLDER[p.name] || 'model-id';
+  const aliasInput = el('input', { class: 'field', type: 'text', placeholder: `client alias, e.g. ${example}`, required: true });
+  const upstreamInput = el('input', { class: 'field', type: 'text', placeholder: `provider model id, e.g. ${example}`, required: true });
+  const nameInput = el('input', { class: 'field', type: 'text', placeholder: 'display name (optional)' });
+  upstreamInput.addEventListener('input', () => {
+    if (!aliasInput.value) aliasInput.value = upstreamInput.value.replace(/[^A-Za-z0-9._-]/g, '-');
+  });
+  const form = el('form', { class: 'add-model-form' },
+    el('h3', {}, `Add ${PROVIDER_LABEL[p.name] || p.name} model`),
+    el('p', { class: 'muted' }, 'Chats with this model are sent to the provider, outside your home.'),
+    el('label', { class: 'field-label' }, 'Provider model id'),
+    upstreamInput,
+    el('label', { class: 'field-label' }, 'Alias (client-facing name)'),
+    aliasInput,
+    el('label', { class: 'field-label' }, 'Display name'),
+    nameInput,
+    el('div', { class: 'modal-actions' },
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: closeModal }, 'Cancel'),
+      el('button', { type: 'submit', class: 'btn btn-primary' }, 'Add cloud model'),
+    ),
+  );
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alias = aliasInput.value.trim();
+    const upstream_model = upstreamInput.value.trim();
+    const display_name = nameInput.value.trim();
+    if (!alias || !upstream_model) return;
+    try {
+      await api(`/api/admin/providers/${encodeURIComponent(p.name)}/models`, {
+        method: 'POST',
+        body: display_name ? { alias, upstream_model, display_name } : { alias, upstream_model },
+      });
+      closeModal();
+      toast('Cloud model added', 'success');
+      _modelsSig = ''; refreshModels();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+  openModal(form);
+  upstreamInput.focus();
 }
 
 
