@@ -1,0 +1,18 @@
+[req]
+distinguished_name = dn
+req_extensions = v3
+prompt = no
+[dn]
+O = HomeHub
+CN = homehub.local
+[v3]
+subjectAltName = @alt
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+[alt]
+DNS.1 = homehub.local
+DNS.2 = localhost
+DNS.3 = kanishka.local
+IP.1  = 192.168.1.9
+IP.2  = 127.0.0.1

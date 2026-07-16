@@ -132,6 +132,7 @@ window.addEventListener('DOMContentLoaded', init);
 async function init() {
   initTheme();
   wireGlobalUI();
+  setupPWA();
   try {
     const me = await api('/api/me');
     onMe(me);
@@ -139,6 +140,53 @@ async function init() {
     if (e.status === 401) showGate();
     else { showGate(); }
   }
+}
+
+/* ---- PWA: register the service worker + offer "install as an app" ---- */
+let _deferredInstall = null;
+
+function setupPWA() {
+  // Service workers only run in a secure context (HTTPS or localhost); over plain
+  // http://<lan-ip> this is a no-op, which is expected until HTTPS is set up.
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  }
+  const installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (installed) return;                                   // already installed — nothing to offer
+
+  // Android / desktop Chrome: capture the native prompt, show our own button.
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); _deferredInstall = e; showInstallBanner('prompt'); });
+  window.addEventListener('appinstalled', () => { _deferredInstall = null; hideInstallBanner(); });
+
+  // iOS Safari: no prompt event — show the "Add to Home Screen" hint once.
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const iosSafari = isIOS && /safari/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
+  if (iosSafari && localStorage.getItem('hub-pwa-ios-dismissed') !== '1') setTimeout(() => showInstallBanner('ios'), 1500);
+}
+
+function showInstallBanner(kind) {
+  if (document.getElementById('pwa-install')) return;
+  const bar = el('div', { id: 'pwa-install', class: 'pwa-install' });
+  if (kind === 'prompt') {
+    bar.append(
+      el('span', {}, '📲 Install Home Hub as an app'),
+      el('span', { class: 'pwa-actions' },
+        el('button', { type: 'button', class: 'btn btn-sm btn-primary', onclick: doInstall }, 'Install'),
+        el('button', { type: 'button', class: 'btn btn-sm btn-ghost', onclick: hideInstallBanner }, 'Later')));
+  } else {
+    bar.append(
+      el('span', {}, '📲 Install: tap Share, then “Add to Home Screen”'),
+      el('button', { type: 'button', class: 'btn btn-sm btn-ghost',
+        onclick: () => { localStorage.setItem('hub-pwa-ios-dismissed', '1'); hideInstallBanner(); } }, 'Got it'));
+  }
+  document.body.appendChild(bar);
+}
+function hideInstallBanner() { const b = document.getElementById('pwa-install'); if (b) b.remove(); }
+async function doInstall() {
+  if (!_deferredInstall) return hideInstallBanner();
+  _deferredInstall.prompt();
+  try { await _deferredInstall.userChoice; } catch (e) { /* ignore */ }
+  _deferredInstall = null; hideInstallBanner();
 }
 
 /* ---- theme: palette (Cubby/Greenhouse/Hearth) + appearance mode ---- */
@@ -2064,6 +2112,11 @@ function openApproveDialog(dev) {
 let MODELS = [];
 let MODELS_POLL = null;
 let _modelsSig = '';
+const PULLING = new Set();        // ollama tags currently downloading (via a catalog "Add"/"Download")
+let INSTALLED_TAGS = new Set();   // ollama tags whose weights are actually on disk (i.e. ready to Start)
+function tagVariants(t) { t = (t || '').trim(); return [t, t.replace(/:latest$/, ''), t.includes(':') ? t : `${t}:latest`]; }
+function llmDownloaded(m) { return tagVariants(m.ollama_tag || m.alias).some((t) => INSTALLED_TAGS.has(t)); }
+function llmPulling(m) { return tagVariants(m.ollama_tag).some((t) => PULLING.has(t)); }
 
 function wireModels() {
   $('#models-refresh').addEventListener('click', () => { _modelsSig = ''; loadModels(); });
@@ -2125,6 +2178,13 @@ async function refreshModels() {
   try { cat = await api('/api/admin/models-catalog'); } catch (e) { cat = null; }
   try { img = await api('/api/admin/image-models'); } catch (e) { img = null; }
   try { res = await api('/api/admin/resources-overview'); } catch (e) { res = null; }
+  // Which ollama tags are actually downloaded — a model is only Start-able once its
+  // weights are on disk. (Registered-but-not-downloaded shows as "downloading".)
+  if (cat && cat.gw_up) {
+    try { const inst = await api('/api/admin/ollama/installed');
+      INSTALLED_TAGS = new Set((inst && inst.installed || []).flatMap((i) => tagVariants(i.tag))); }
+    catch (e) { /* keep last-known */ }
+  }
 
   // Live RAM/CPU + aggregate refresh every poll (small); the model grid
   // re-renders only when structure/disk changes so cards don't flicker.
@@ -2138,7 +2198,7 @@ async function refreshModels() {
   // every 5s poll. Keep the full `cat` for renderModels().
   const catSig = cat ? {
     gw_up: cat.gw_up, voice_up: cat.voice_up,
-    llm: (cat.llm || []).map((m) => ({ alias: m.alias, role: m.role, state: m.state, loaded: m.loaded, display_name: m.display_name, ollama_tag: m.ollama_tag })),
+    llm: (cat.llm || []).map((m) => ({ alias: m.alias, role: m.role, state: m.state, loaded: m.loaded, display_name: m.display_name, ollama_tag: m.ollama_tag, dl: llmDownloaded(m), pull: llmPulling(m) })),
     voice: (cat.voice || []).map((m) => ({ name: m.name, role: m.role, state: m.state, loaded: m.loaded, display_name: m.display_name })),
   } : null;
   const structSig = JSON.stringify({
@@ -2242,6 +2302,7 @@ function renderModels(cat, img, res) {
     ...m, source: 'gateway', key: m.alias, removable: true, subtitle: m.ollama_tag,
     tokens_24h: (m.prompt_tokens_24h || 0) + (m.completion_tokens_24h || 0),
     has_tokens: m.role !== 'embed', offline: !gwUp, disk_bytes: dk(aiDisk, m.alias),
+    downloaded: gwUp ? llmDownloaded(m) : true, pulling: llmPulling(m),
   })));
   voice.forEach((m) => aiGrid.append(modelCard({
     ...m, source: 'voice', key: m.name, removable: false, subtitle: 'voice service',
@@ -2323,10 +2384,21 @@ function modelCard(m) {
   const act = (label, action, cls) => el('button',
     { class: `btn btn-sm ${cls || 'btn-ghost'}`, dataset: { ...ds, modelAction: action } }, label);
 
+  // A gateway model whose weights aren't on disk yet is NOT startable — show its
+  // download state (and a Download button if a pull isn't already running).
+  const notReady = m.source === 'gateway' && m.downloaded === false;
+  const dispState = notReady ? (m.pulling ? 'downloading' : 'missing') : m.state;
+  const dispLabel = notReady ? (m.pulling ? 'downloading…' : 'not downloaded') : stateLabel(m.state);
+
   const actions = el('div', { class: 'model-actions' });
-  if (m.state === 'stopped')   actions.append(act('Start', 'start', 'btn-primary'));
-  if (m.state === 'running')   actions.append(act('Suspend', 'suspend'), act('Shutdown', 'shutdown'));
-  if (m.state === 'suspended') actions.append(act('Resume', 'resume', 'btn-primary'), act('Shutdown', 'shutdown'));
+  if (notReady) {
+    if (m.pulling) actions.append(el('span', { class: 'state-pill state-downloading' }, el('span', { class: 'state-dot' }), 'downloading…'));
+    else actions.append(el('button', { class: 'btn btn-sm btn-primary', dataset: { modelPull: '1', key: m.key, tag: m.ollama_tag || m.subtitle || '', role: m.role || '' } }, 'Download'));
+  } else {
+    if (m.state === 'stopped')   actions.append(act('Start', 'start', 'btn-primary'));
+    if (m.state === 'running')   actions.append(act('Suspend', 'suspend'), act('Shutdown', 'shutdown'));
+    if (m.state === 'suspended') actions.append(act('Resume', 'resume', 'btn-primary'), act('Shutdown', 'shutdown'));
+  }
   actions.append(el('button', { class: 'btn btn-sm btn-ghost', dataset: { modelMetrics: '1', key: m.key, source: m.source } }, 'Metrics'));
   if (m.removable) actions.append(el('button', { class: 'btn btn-sm btn-ghost danger', dataset: { modelRemove: '1', key: m.key } }, 'Remove'));
 
@@ -2337,7 +2409,7 @@ function modelCard(m) {
   if (m.requests_24h) stats.append(mstat(String(m.requests_24h), 'requests 24h'));
   if (m.has_tokens && m.tokens_24h) stats.append(mstat(fmtNum(m.tokens_24h), 'tokens 24h'));
 
-  return el('div', { class: `model-card state-${m.state}`, dataset: { key: m.key } },
+  return el('div', { class: `model-card state-${dispState}`, dataset: { key: m.key } },
     el('div', { class: 'model-head' },
       el('div', { class: 'model-id' },
         el('strong', {}, m.display_name || m.key),
@@ -2345,7 +2417,7 @@ function modelCard(m) {
       ),
       el('div', { class: 'model-head-right' },
         el('span', { class: `role-badge role-${m.role}` }, ROLE_LABEL[m.role] || m.role),
-        el('span', { class: `state-pill state-${m.state}` }, el('span', { class: 'state-dot' }), stateLabel(m.state)),
+        el('span', { class: `state-pill state-${dispState}` }, el('span', { class: 'state-dot' }), dispLabel),
       ),
     ),
     el('div', { class: 'model-tag mono muted' }, m.subtitle || ''),
@@ -2368,6 +2440,7 @@ async function onModelClick(e) {
   const { key, source } = btn.dataset;
   if (btn.dataset.startAi)      return startAiFromModel(btn);
   if (btn.dataset.imgDownload)  return downloadImageModel(btn.dataset.imgDownload, btn);
+  if (btn.dataset.modelPull)    return pullModel(btn.dataset.tag, btn.dataset.role, btn);
   if (btn.dataset.modelAction)  return doModelAction(key, btn.dataset.modelAction, source, btn);
   if (btn.dataset.modelMetrics) return openMetricsDialog(key, source);
   if (btn.dataset.modelRemove)  return removeModel(key);
@@ -2382,6 +2455,17 @@ async function startAiFromModel(btn) {
     setTimeout(() => refreshModels(), 2500);
     setTimeout(() => { _modelsSig = ''; refreshModels(); }, 9000);
   } catch (e) { toast(e.message, 'error'); if (btn) btn.disabled = false; }
+}
+
+async function pullModel(tag, role, btn) {
+  if (!tag) return toast('No model tag to download', 'error');
+  if (btn) { btn.disabled = true; btn.textContent = 'downloading…'; }
+  try {
+    await api('/api/admin/models/pull', { method: 'POST', body: { tag } });
+    toast('Downloading…', 'success');
+    trackPull(tag, btn);
+    _modelsSig = ''; await refreshModels();
+  } catch (e) { toast(e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Download'; } }
 }
 
 async function doModelAction(key, action, source, btn) {
@@ -2497,8 +2581,13 @@ async function catalogAddClick(e) {
       const tag = b.dataset.addLlm, role = b.dataset.addLlmRole;
       const alias = tag.replace(/:/g, '-').replace(/[^A-Za-z0-9._-]/g, '-');
       const res = await api('/api/admin/models', { method: 'POST', body: { alias, ollama_tag: tag, role, pull: true } });
-      toast(res.pulling ? 'Added — downloading…' : 'Added', 'success'); b.textContent = 'added';
-      if (res.pulling) trackPull(tag);
+      if (res.pulling) {
+        b.textContent = 'downloading…';       // stays disabled; trackPull flips it to "✓ installed"
+        toast('Added — downloading…', 'success');
+        trackPull(tag, b);
+      } else {
+        b.textContent = '✓ installed'; toast('Added', 'success');
+      }
       _modelsSig = ''; refreshModels();
     }
   } catch (err) { toast(err.message, 'error'); b.disabled = false; b.textContent = orig; }
@@ -2606,16 +2695,21 @@ async function openAddModelDialog() {
   ));
 }
 
-function trackPull(tag) {
+function trackPull(tag, btn) {
+  PULLING.add(tag);                     // marks the model card as "downloading…"
+  const finish = (ok, msg) => {
+    PULLING.delete(tag);
+    if (btn) { btn.disabled = ok; btn.textContent = ok ? '✓ installed' : 'Retry'; }
+    if (msg) toast(msg, ok ? 'success' : 'error');
+    _modelsSig = ''; refreshModels();   // re-render: Start now appears (or the Download button returns)
+  };
   const iv = setInterval(async () => {
     let s;
     try { s = await api(`/api/admin/models/pull/status?tag=${encodeURIComponent(tag)}`); }
-    catch { clearInterval(iv); return; }
-    if (s.status === 'done') {
-      clearInterval(iv); toast(`${tag} downloaded`, 'success'); _modelsSig = ''; refreshModels();
-    } else if (s.status === 'error') {
-      clearInterval(iv); toast(`Download failed: ${s.detail || 'error'}`, 'error');
-    }
+    catch { clearInterval(iv); finish(false); return; }
+    if (btn && btn.textContent.startsWith('downloading') && s.percent != null) btn.textContent = `downloading ${Math.round(s.percent)}%`;
+    if (s.status === 'done') { clearInterval(iv); finish(true, `${tag} downloaded`); }
+    else if (s.status === 'error') { clearInterval(iv); finish(false, `Download failed: ${s.detail || 'error'}`); }
   }, 3000);
   setTimeout(() => clearInterval(iv), 30 * 60 * 1000);
 }

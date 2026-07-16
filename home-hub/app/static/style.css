@@ -785,6 +785,8 @@ body.modal-open { overflow: hidden; }
 .model-card.state-running   { border-left-color: var(--success); }
 .model-card.state-suspended { border-left-color: var(--pop); }
 .model-card.state-stopped   { border-left-color: var(--faint); }
+.model-card.state-downloading { border-left-color: var(--accent); }
+.model-card.state-missing   { border-left-color: var(--pop); }
 .model-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-2); }
 .model-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .model-id strong { font-family: var(--font-head); font-size: var(--fs-md); }
@@ -799,6 +801,10 @@ body.modal-open { overflow: hidden; }
 .state-pill.state-running   { background: var(--success-soft); color: var(--success); }
 .state-pill.state-suspended { background: var(--pop-soft); color: var(--text); }
 .state-pill.state-stopped   { background: var(--surface-3); color: var(--muted); }
+.state-pill.state-downloading { background: var(--accent-soft); color: var(--accent); }
+.state-pill.state-downloading .state-dot { animation: pulse-dot 1s ease-in-out infinite; }
+.state-pill.state-missing   { background: var(--pop-soft); color: var(--text); }
+@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
 
 .model-stats { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
 .mstat { display: flex; flex-direction: column; }
@@ -940,6 +946,12 @@ body.modal-open { overflow: hidden; }
 .img-processing { font-size: var(--fs-sm); }
 .ribbon-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .ribbon-actions #ribbon-sel-count { margin-right: var(--sp-1); }
+/* PWA "install as an app" banner */
+.pwa-install { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 300;
+  display: flex; align-items: center; gap: var(--sp-3); max-width: 92vw;
+  padding: 10px 16px; border-radius: var(--r-pill); background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); box-shadow: var(--shadow-md); font-size: var(--fs-sm); }
+.pwa-install .pwa-actions { display: flex; gap: var(--sp-2); }
 /* Hub-native Image → Image staging: shows the selected image(s) as the init image */
 .img-stage { margin: var(--sp-3) 0 var(--sp-4); padding: var(--sp-3);
   border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-2); }

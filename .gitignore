@@ -43,6 +43,10 @@ logs/
 #     re-mint tokens. (The .env files themselves say "keep out of version control".)
 .env
 **/.env
+# TLS private keys — never commit (regenerate with installer/gen-local-cert.sh)
+home-hub/certs/*.key
+home-hub/certs/*.csr
+home-hub/certs/*.srl
 
 # --- Archives / editor / OS cruft ---
 homeLLM.zip

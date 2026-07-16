@@ -183,6 +183,17 @@ def create_app() -> FastAPI:
             "</body></html>"
         )
 
+    @app.get("/sw.js", include_in_schema=False)
+    def service_worker():
+        """Serve the PWA service worker from the ROOT so its scope covers the whole
+        app (a SW only controls its own path and below). It only registers in a
+        secure context (HTTPS or localhost) — a no-op over plain http://<lan-ip>."""
+        sw = config.STATIC_DIR / "sw.js"
+        body = sw.read_text(encoding="utf-8") if sw.exists() else "/* no service worker */"
+        return PlainTextResponse(
+            body, media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
     return app
 
 

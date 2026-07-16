@@ -1,0 +1,26 @@
+# Advertise a friendly <name>.local on the LAN via mDNS (avahi), pointing at the
+# hub's pinned LAN IP. Lets every Apple/Windows/Linux device reach the appliance
+# at http://homehub.local with zero per-device config.
+#
+# Install:
+#   sudo cp installer/homehub-mdns.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now homehub-mdns.service
+#
+# Change the name: edit the ExecStart hostname, then daemon-reload + restart.
+# Add MORE names: copy this to homehub-mdns-<name>.service with its own ExecStart.
+[Unit]
+Description=Advertise homehub.local on the LAN via mDNS
+Requires=avahi-daemon.service
+After=avahi-daemon.service network-online.target
+Wants=network-online.target
+
+[Service]
+# -a publish an address record, -R keep renewing until stopped.
+ExecStart=/usr/bin/avahi-publish -a -R homehub.local 192.168.1.9
+Restart=always
+RestartSec=3
+User=kanishka
+
+[Install]
+WantedBy=multi-user.target
