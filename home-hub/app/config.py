@@ -106,6 +106,16 @@ VOICE_SVC_DIR = os.getenv("VOICE_SVC_DIR", "/home/kanishka/kk_works/LLMs/voice-s
 FASTSD_DIR = os.getenv("FASTSD_DIR", "/home/kanishka/kk_works/fastsdcpu")
 OLLAMA_BIN = os.getenv("OLLAMA_BIN", os.path.expanduser("~/.local/bin/ollama"))
 
+# --- Smart Home (hybrid: LAN-local control + cloud-by-exception push) --------
+# Feature flag for the Home tab / /api/home routes. On by default, but the
+# feature is INERT until an admin connects a provider (no outbound calls until
+# then). The provider token is kept in the encrypted secret store, not here.
+SMARTHOME_ENABLED = _b(os.getenv("SMARTHOME_ENABLED"), True)
+SMARTHOME_DEFAULT_PROVIDER = os.getenv("SMARTHOME_DEFAULT_PROVIDER", "home_assistant")
+# Refuse a public provider URL by default so control stays on the home LAN and
+# consistent with the egress lock. Flip only for a routed-VPN Home Assistant.
+SMARTHOME_ALLOW_NON_LAN = _b(os.getenv("SMARTHOME_ALLOW_NON_LAN"), False)
+
 # Frontend assets live under app/ (served by the backend). Allow override; if the
 # package-local dir is empty, fall back to a project-root static/templates dir.
 _APP_DIR = Path(__file__).resolve().parent

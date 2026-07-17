@@ -1,6 +1,6 @@
 # HomeHub — Feature Tree & Status
 
-Last updated: **2026‑07‑16**
+Last updated: **2026‑07‑18**
 
 **Legend:** 🟢 Completed & verified · 🟡 Partial (built, one step remains) · 🟠 Pending (agreed/required, not built) · 🔵 Future enhancement (Pro / companion‑app tier)
 
@@ -20,7 +20,7 @@ Last updated: **2026‑07‑16**
 │   ├── 🟡 Local HTTPS :443 (built & verified — same single sudo command: sudo bash installer/enable-platform.sh)
 │   ├── 🟢 Privacy hardening (external telemetry OFF, model libs offline, verified 0 phone‑home)
 │   ├── 🟡 Egress firewall allowlist (built & verified — per‑service systemd eBPF lock; activate: sudo installer/egress.sh lock; see docs/design/platform-activation.md)
-│   ├── 🟢 Tests: offline pytest suites for gateway + hub (50 tests, tmp‑sqlite, no network)
+│   ├── 🟢 Tests: offline pytest suites for gateway + hub (93 tests, tmp‑sqlite, no network)
 │   └── 🟢 Off‑box backup to GitHub (code, config, docs — no models/secrets)
 │
 ├── 👨‍👩‍👧 Family & Access
@@ -101,22 +101,25 @@ Last updated: **2026‑07‑16**
 │   ├── 🔵 Room‑level presence (ESPresense nodes)
 │   └── 🔵 Ring family phone (HA Companion critical push)
 │
-└── 🏡 Smart Home  (scoped → hybrid roadmap)
-    ├── 🔵 Home Assistant integration (device registry, scenes, automations)
-    ├── 🔵 Home tab (rooms, live states, per‑user device permissions)
-    └── 🔵 Voice + LLM control ("dim the living room to 30 %")
+└── 🏡 Smart Home  (hybrid local‑first — skeleton shipped → docs/design/smart-home.md)
+    ├── 🟡 Home Assistant integration (provider adapter + REST states/actions + LAN‑only guard; needs an HA link + hub restart)
+    ├── 🟡 Home tab (status, connect flow, rooms, device on/off; live after restart)
+    ├── 🟡 Per‑user device permissions (per‑entity grant model + store + checks; assignment UI still 🔵)
+    ├── 🔵 Live state push (HA WebSocket) + voice + LLM control ("dim the living room to 30 %")
+    └── 🔵 Cloud‑by‑exception push bridge (APNs/FCM to locked phones — lands with native shells)
 ```
 
 ## Snapshot by the numbers
 | Status | Count | Meaning |
 |---|---|---|
 | 🟢 Completed | **43** | Built, verified, in production on the appliance (calendar + secret store live after the next hub restart) |
-| 🟡 Partial | **6** | Built & tested; one activation step remains (sudo enable‑platform, egress lock, cloud API key + restart, HTTPS‑gated PWA install, router name) |
+| 🟡 Partial | **9** | Built & tested; one step remains (sudo enable‑platform, egress lock, cloud API key + restart, HTTPS‑gated PWA install, router name, **smart‑home: link HA + restart**) |
 | 🟠 Pending | **2** | Agreed/required, not yet built — **kids NSFW filter is the critical one** |
-| 🔵 Future (Pro) | **25+** | Scoped & feasibility‑verified; companion‑app / backend tier |
+| 🔵 Future (Pro) | **24+** | Scoped & feasibility‑verified; companion‑app / backend tier |
 
 ## The short "what's next" list
 1. **Kids‑safety/NSFW image filter** 🟠 — mandatory before children see generated art.
 2. One sudo command 🟡 — `sudo bash installer/enable-platform.sh` activates HTTPS :443 (full Android/desktop PWA) + reboot‑proof `homehub.local`; then optionally `sudo installer/egress.sh lock` for the LAN‑only egress lock. Verify with `installer/verify-platform.sh` (no sudo).
-3. Restart hub + gateway 🟡 — brings the merged calendar, secret store and cloud‑provider code live; add a provider API key (+ per‑key opt‑in) only if cloud AI is wanted.
-4. Then the Pro track per `roadmap-app-shells-and-safety.md` (native shells first).
+3. Restart hub + gateway 🟡 — brings the merged calendar, secret store, cloud‑provider and **Smart Home** code live; add a provider API key (+ per‑key opt‑in) only if cloud AI is wanted.
+4. Smart Home 🟡 — skeleton shipped (Home tab + Home Assistant adapter, `docs/design/smart-home.md`); after the restart, link an HA instance from the Home tab. Next build‑out: live WebSocket state, voice/LLM control, per‑user device‑permission UI.
+5. Then the Pro track per `roadmap-app-shells-and-safety.md` (native shells first).

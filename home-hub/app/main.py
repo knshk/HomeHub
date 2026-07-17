@@ -20,6 +20,7 @@ from . import (
     routes_keys,
     routes_admin,
     routes_secrets,
+    routes_smarthome,
     routes_voice,
     routes_studio,
 )
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_keys.router)
     app.include_router(routes_admin.router)
     app.include_router(routes_secrets.router)
+    app.include_router(routes_smarthome.router)
     app.include_router(routes_voice.router)
     app.include_router(routes_studio.router)
 

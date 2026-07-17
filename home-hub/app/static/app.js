@@ -665,6 +665,7 @@ function selectTab(tab) {
     case 'notes':      loadNotes(); break;
     case 'checklists': loadChecklists(); break;
     case 'calendar':   loadCalendar(); break;
+    case 'home':       loadHome(); break;
     case 'files':      loadFiles(); break;
     case 'keys':       loadKeys(); break;
     case 'admin':      loadDevices(); break;
@@ -1826,6 +1827,129 @@ async function loadCalendar() {
   renderCalMonth();
   renderCalUpcoming();
   renderChores();
+}
+
+/* ===========================================================================
+ * SMART HOME — hybrid, LAN-first control (skeleton).
+ * Reads: any approved device. Connect/sync/control: admin, or a per-entity
+ * grant (all enforced server-side). Inert until an admin links a provider.
+ * ========================================================================= */
+const HOME = { status: null };
+
+function homeIsAdmin() { return !!(State.me && State.me.role === 'admin'); }
+
+async function loadHome() {
+  if (!State.me || State.me.status !== 'approved') return;
+  const body = $('#home-body');
+  const sync = $('#home-sync');
+  if (sync) sync.hidden = true;
+  body.replaceChildren(el('div', { class: 'empty-hint' }, 'Loading…'));
+
+  let st;
+  try {
+    st = await api('/api/home/status');
+  } catch (e) {
+    body.replaceChildren(el('div', { class: 'empty-hint' }, e.message));
+    return;
+  }
+  HOME.status = st;
+
+  if (!st.enabled) {
+    body.replaceChildren(el('div', { class: 'empty-hint' }, 'Smart Home is turned off.'));
+    return;
+  }
+  if (!st.configured) {
+    body.replaceChildren(homeSetupCard(st));
+    return;
+  }
+  if (sync && st.is_admin) { sync.hidden = false; sync.onclick = homeSync; }
+  await renderHomeConnected(st);
+}
+
+function homeSetupCard(st) {
+  if (!st.is_admin) {
+    return el('div', { class: 'empty-hint' },
+      'No smart home is connected yet. Ask an admin to link Home Assistant.');
+  }
+  const url = el('input', { class: 'field', type: 'text',
+    placeholder: 'http://homeassistant.local:8123', autocapitalize: 'none' });
+  const token = el('input', { class: 'field', type: 'password',
+    placeholder: 'Home Assistant long-lived token', autocomplete: 'off' });
+  const msg = el('p', { class: 'form-error', hidden: true });
+  const btn = el('button', { class: 'btn btn-primary', onclick: async () => {
+    msg.hidden = true; btn.disabled = true;
+    try {
+      await api('/api/home/connect', { method: 'POST', body: {
+        provider: 'home_assistant', base_url: url.value.trim(), token: token.value } });
+      toast('Smart home connected', 'success');
+      loadHome();
+    } catch (e) { msg.textContent = e.message; msg.hidden = false; }
+    finally { btn.disabled = false; }
+  } }, 'Connect');
+  return el('div', { class: 'home-setup' },
+    el('p', { class: 'home-lead' },
+      'Link your Home Assistant to see and control lights, locks and sensors from '
+      + 'the hub. It stays on your home network — nothing is sent to the cloud.'),
+    el('label', { class: 'field-label' }, 'Home Assistant address (on your WiFi)'), url,
+    el('label', { class: 'field-label' }, 'Long-lived access token'), token,
+    msg, btn);
+}
+
+async function homeSync() {
+  try {
+    const r = await api('/api/home/sync', { method: 'POST' });
+    toast(`Synced ${r.entity_count} devices`, 'success');
+    loadHome();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function renderHomeConnected(st) {
+  const body = $('#home-body');
+  const status = el('div', { class: 'home-status' },
+    el('span', { class: `home-dot ${st.connected ? 'ok' : 'bad'}` }),
+    el('span', {}, st.connected
+      ? `Connected to ${st.provider} · ${st.entity_count} devices`
+      : `Not reachable${st.last_error ? ': ' + st.last_error : ''}`));
+  body.replaceChildren(status);
+  if (homeIsAdmin()) {
+    body.append(el('button', { class: 'btn-link', onclick: async () => {
+      if (!window.confirm('Disconnect the smart home?')) return;
+      try { await api('/api/home/disconnect', { method: 'POST' }); loadHome(); }
+      catch (e) { toast(e.message, 'error'); }
+    } }, 'Disconnect'));
+  }
+
+  let rooms = [];
+  try { rooms = await api('/api/home/rooms'); } catch (e) { /* status card stands alone */ }
+  if (!rooms.length) {
+    body.append(el('div', { class: 'empty-hint' }, 'No devices cached yet — tap Sync.'));
+    return;
+  }
+  for (const room of rooms) {
+    body.append(el('h3', { class: 'home-room' }, room.area));
+    const grid = el('div', { class: 'home-grid' });
+    for (const ent of room.entities) grid.append(homeDeviceCard(ent));
+    body.append(grid);
+  }
+}
+
+function homeDeviceCard(ent) {
+  const children = [
+    el('div', { class: 'home-dev-name' }, ent.name || ent.entity_id),
+    el('div', { class: 'home-dev-state' }, ent.state == null ? '—' : String(ent.state)),
+  ];
+  if (ent.controllable && ent.can_control) {
+    const on = String(ent.state).toLowerCase() === 'on';
+    children.push(el('button', { class: 'btn btn-sm', onclick: async (e) => {
+      e.currentTarget.disabled = true;
+      try {
+        await api(`/api/home/entities/${encodeURIComponent(ent.entity_id)}/action`,
+          { method: 'POST', body: { action: on ? 'turn_off' : 'turn_on' } });
+        loadHome();
+      } catch (err) { toast(err.message, 'error'); e.currentTarget.disabled = false; }
+    } }, on ? 'Turn off' : 'Turn on'));
+  }
+  return el('div', { class: 'home-dev' }, ...children);
 }
 
 /* ---- month grid ---- */
