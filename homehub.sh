@@ -138,7 +138,38 @@ cmd_status() {
 
 cmd_https() { need_root https; exec "$HERE/installer/enable-platform.sh"; }
 
-case "${1:-start}" in
+cmd_help() {
+  cat <<EOF
+HomeHub control script — run the appliance and reach it from every device.
+
+Usage: $0 <command>
+
+Commands:
+  start           Start/refresh all services, open the LAN firewall (:80/:443),
+                  publish homehub.local, health-check, print the URLs.   [sudo]
+  restart         Restart all services (use after a code change).        [sudo]
+  stop            Stop the family-facing services (home-hub, gateway,
+                  voice); leaves ollama running.                         [sudo]
+  stop-all        Stop EVERYTHING incl. ollama + the mDNS advert.        [sudo]
+    shutdown        alias for stop-all
+  status          Show service + firewall + reachability status.      [no sudo]
+  url             Print the addresses to open on other devices.       [no sudo]
+  https           Turn on local HTTPS + permanent homehub.local
+                  (delegates to installer/enable-platform.sh).           [sudo]
+  help            Show this help.                                     [no sudo]
+    -h, --help      aliases for help
+
+After 'start', open from any device on the same WiFi:
+  http://<this-box-LAN-IP>     or     http://homehub.local
+
+Examples:
+  sudo $0 start        # make the hub live + reachable on the LAN
+  $0 status            # check what's up and where to reach it
+  sudo $0 stop-all     # take the whole appliance down
+EOF
+}
+
+case "${1:-help}" in
   start)   cmd_start ;;
   restart) cmd_restart ;;
   stop)    cmd_stop ;;
@@ -146,5 +177,6 @@ case "${1:-start}" in
   status)  cmd_status ;;
   url|urls) print_urls ;;
   https)   cmd_https ;;
-  *) echo "usage: $0 {start|restart|stop|stop-all|status|url|https}"; exit 1 ;;
+  help|-h|--help) cmd_help ;;
+  *) echo "unknown command: $1" >&2; echo >&2; cmd_help >&2; exit 1 ;;
 esac
