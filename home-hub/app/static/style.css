@@ -1373,3 +1373,57 @@ body.modal-open { overflow: hidden; }
   /* Greeting and the hero sit side by side, so the fold carries real content. */
   .lc-head { padding: var(--sp-6) 0 var(--sp-4); }
 }
+
+/* =========================================================================
+   Launcher previews (desktop only) — a peek at the noticeboard and what's due.
+   JS renders these only above 1080px, so the phone launcher is unchanged; the
+   display:none below is belt-and-braces for a resize mid-render.
+   ========================================================================= */
+#lc-previews { display: none; }
+
+@media (min-width: 1080px) {
+  #lc-previews { display: block; margin-top: var(--sp-5); }
+  .lc-prev-row {
+    display: grid; gap: var(--sp-3);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  }
+  .lc-prev {
+    border: 1px solid var(--border); border-radius: var(--r-card);
+    background: var(--surface); box-shadow: var(--shadow-sm);
+    padding: var(--sp-4); min-width: 0;
+  }
+  .lc-prev-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--sp-2); margin-bottom: var(--sp-3);
+  }
+  .lc-prev-title {
+    font-family: var(--font-head); font-weight: 700; font-size: var(--fs-md);
+  }
+  .lc-prev-empty { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
+
+  /* notes: small pastel cards, inheriting the same --note-c the board uses */
+  .lc-prev-notes { display: grid; gap: var(--sp-2); grid-template-columns: 1fr 1fr; }
+  .lc-prev-note {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+    background: var(--note-c, var(--note-default)); color: #2b2418;
+    border: 1px solid rgba(0,0,0,.06); font-size: var(--fs-xs); line-height: 1.35;
+  }
+  .lc-prev-note b { font-size: var(--fs-sm); }
+  .lc-prev-note span {
+    opacity: .78; overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+
+  /* tasks: one line each, overdue carries a danger rail */
+  .lc-prev-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .lc-prev-item {
+    display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0;
+    padding: 7px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm);
+  }
+  .lc-prev-item:first-child { border-top: 0; }
+  .lc-prev-item.overdue { padding-left: var(--sp-2); border-left: 2px solid var(--danger); }
+  .lc-prev-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lc-prev-meta { color: var(--muted); font-size: var(--fs-xs); flex: 0 0 auto; }
+  .lc-prev-item.overdue .lc-prev-meta { color: var(--danger); font-weight: 700; }
+}

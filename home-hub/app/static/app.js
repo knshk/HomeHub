@@ -419,6 +419,11 @@ function wireGlobalUI() {
     const t = e.target.closest('[data-lc-tab]');
     if (t) selectTab(t.dataset.lcTab);
   });
+  // Preview cards carry the same data-lc-tab contract on their "→" buttons.
+  $('#lc-previews')?.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-lc-tab]');
+    if (t) selectTab(t.dataset.lcTab);
+  });
 
   // Chat header chips open the bottom sheets; anything conclusive closes them.
   $('#chat-model-chip')?.addEventListener('click', () => openSheet('model'));
@@ -927,6 +932,109 @@ function renderLauncher() {
   }
 
   renderInstallTile();
+  renderLauncherPreviews();      // desktop only; no-op (and no requests) on phones
+}
+
+/* ---- Desktop landing previews -------------------------------------------
+ * A peek at the noticeboard and what's due, so a wide home screen answers
+ * something instead of only linking onward. Desktop only: below the breakpoint
+ * this renders nothing AND makes no requests, so the phone launcher is
+ * untouched both visually and in cost. Failures degrade to an empty card. */
+const LC_PREVIEW_MIN = 1080;
+
+function lcPreviewsWanted() {
+  return window.matchMedia(`(min-width: ${LC_PREVIEW_MIN}px)`).matches;
+}
+
+async function renderLauncherPreviews() {
+  const host = $('#lc-previews');
+  if (!host) return;
+  host.replaceChildren();
+  if (!lcPreviewsWanted()) return;
+
+  const wantNotes = can('notes');
+  const wantTasks = can('checklists');
+  if (!wantNotes && !wantTasks) return;
+
+  const [notes, lists, chores] = await Promise.all([
+    wantNotes ? api('/api/notes').catch(() => []) : Promise.resolve([]),
+    wantTasks ? api('/api/checklists').catch(() => []) : Promise.resolve([]),
+    wantTasks ? api('/api/calendar/chores').catch(() => []) : Promise.resolve([]),
+  ]);
+
+  // The launcher may have been left while we were fetching.
+  if (State.activeTab !== 'launcher' || !lcPreviewsWanted()) return;
+
+  const cards = [];
+  if (wantNotes) cards.push(lcNotesCard(notes || []));
+  if (wantTasks) cards.push(lcTasksCard(lists || [], chores || []));
+  if (cards.length) host.append(el('div', { class: 'lc-prev-row' }, ...cards));
+}
+
+function lcPrevHead(title, tab, label) {
+  return el('div', { class: 'lc-prev-head' },
+    el('span', { class: 'lc-prev-title' }, title),
+    el('button', { type: 'button', class: 'btn btn-sm', dataset: { lcTab: tab } }, label));
+}
+
+function lcNotesCard(notes) {
+  const card = el('section', { class: 'lc-prev' }, lcPrevHead('Noticeboard', 'notes', 'Notes →'));
+  // Pinned notes first — they're the ones the household wanted kept visible.
+  const items = notes.slice()
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    .slice(0, 4);
+  if (!items.length) {
+    card.append(el('p', { class: 'lc-prev-empty' }, 'Nothing on the board yet.'));
+    return card;
+  }
+  card.append(el('div', { class: 'lc-prev-notes' }, ...items.map((n) =>
+    el('div', { class: `lc-prev-note note-${n.color || 'default'}` },
+      el('b', {}, (n.pinned ? '★ ' : '') + (n.title || 'Untitled')),
+      n.body ? el('span', {}, n.body.slice(0, 80)) : null))));
+  return card;
+}
+
+function lcTasksCard(lists, chores) {
+  const card = el('section', { class: 'lc-prev' }, lcPrevHead('Tasks', 'checklists', 'Lists →'));
+  const today = ymd(new Date());
+  const rows = [];
+
+  // Time-bound chores lead: overdue first, then due today, then the rest.
+  const open = (chores || []).filter((ch) => !ch.done_at);
+  const rank = (ch) => {
+    if (!ch.due_date) return 3;
+    if (ch.due_date < today) return 0;
+    return ch.due_date === today ? 1 : 2;
+  };
+  for (const ch of open.slice().sort((a, b) => rank(a) - rank(b)).slice(0, 3)) {
+    const overdue = !!(ch.due_date && ch.due_date < today);
+    const when = !ch.due_date ? ''
+      : overdue ? 'overdue'
+      : (ch.due_date === today ? 'today' : fmtDay(ch.due_date));
+    rows.push({
+      overdue,
+      text: ch.title || '',
+      meta: [ch.assignee, when].filter(Boolean).join(' · '),
+    });
+  }
+
+  // Then the next open checklist items — the actual next actions.
+  for (const cl of (lists || [])) {
+    for (const it of (cl.items || [])) {
+      if (it.done || rows.length >= 6) continue;
+      rows.push({ text: it.text || '', meta: cl.title || '' });
+    }
+  }
+
+  if (!rows.length) {
+    card.append(el('p', { class: 'lc-prev-empty' }, 'Nothing due — all clear.'));
+    return card;
+  }
+  card.append(el('ul', { class: 'lc-prev-rows' }, ...rows.map((r) =>
+    el('li', { class: 'lc-prev-item' + (r.overdue ? ' overdue' : '') },
+      el('span', { class: 'lc-prev-text' }, r.text),
+      r.meta ? el('span', { class: 'lc-prev-meta' }, r.meta) : null))));
+  return card;
 }
 
 function renderLauncherStatus() {
@@ -1070,6 +1178,10 @@ function stopGenPoll() { if (GEN_POLL) { clearInterval(GEN_POLL); GEN_POLL = nul
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => e.preventDefault());
 window.addEventListener('resize', () => { if (State.activeTab === 'images') updateRibbonNav(); });
+// Crossing the desktop breakpoint should add/remove the launcher previews.
+window.addEventListener('resize', () => {
+  if (State.activeTab === 'launcher') renderLauncherPreviews();
+});
 
 const IMG_SEGMENTS = [
   { op: 'img2img', label: 'Image → Image', hint: 'opens the Studio below' },
