@@ -208,6 +208,12 @@ def update_device(conn, device_id: int, *, username: str | None = None, role: st
     conn.commit()
 
 
+def delete_device(conn, device_id: int) -> None:
+    """Permanently remove a device row (used by admins to clear stale entries)."""
+    execute(conn, "DELETE FROM devices WHERE id=?", (device_id,))
+    conn.commit()
+
+
 def list_devices(conn) -> list[sqlite3.Row]:
     return query_all(conn, "SELECT * FROM devices ORDER BY created_at DESC")
 

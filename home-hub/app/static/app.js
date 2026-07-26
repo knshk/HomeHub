@@ -251,9 +251,46 @@ function openSettings() {
     palRow,
     el('label', { class: 'field-label' }, 'Appearance'),
     modeRow,
+    settingsInstallSection(),
     settingsAdminSection(),
     el('div', { class: 'modal-actions' }, el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Done')),
   ));
+}
+
+/* "Install as an app" in Settings — discoverable for everyone, so install
+ * doesn't depend on catching the one-time auto banner. Fires the native prompt
+ * when available; otherwise gives the right per-platform instructions. */
+function settingsInstallSection() {
+  const installed = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if (installed) return null;
+  const wrap = el('div', { class: 'settings-install' },
+    el('hr', { class: 'settings-sep' }),
+    el('label', { class: 'field-label' }, 'Install as an app'));
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  if (_deferredInstall) {
+    wrap.append(
+      el('p', { class: 'muted', style: 'margin:0 0 .4rem' }, 'Add Home Hub to your home screen.'),
+      el('button', { class: 'btn btn-primary btn-sm', onclick: doInstall }, 'Install app'));
+  } else if (isIOS) {
+    wrap.append(el('p', { class: 'muted', style: 'margin:0' },
+      'On iPhone/iPad, in Safari: tap the Share button, then "Add to Home Screen".'));
+  } else if (!window.isSecureContext) {
+    wrap.append(el('p', { class: 'muted', style: 'margin:0' },
+      'To install on Android/desktop, open the hub over https:// (a secure '
+      + 'connection is required). Ask the admin to run: sudo ./homehub.sh https'));
+  } else {
+    // HTTPS but no install prompt -> the browser doesn't trust the local cert.
+    wrap.append(
+      el('p', { class: 'muted', style: 'margin:0 0 .4rem' },
+        'Almost there — your browser needs to trust this hub’s certificate '
+        + 'before it can install. Download it, then install it as a trusted '
+        + 'CA in your device settings, and reopen this page.'),
+      el('a', { class: 'btn btn-ghost btn-sm', href: '/static/homehub-ca.crt',
+        download: 'homehub-ca.crt' }, 'Download hub certificate'));
+  }
+  return wrap;
 }
 
 /* Admin PIN in Settings: non-admins unlock admin from this device with the PIN;
@@ -2689,7 +2726,10 @@ function renderDevices() {
         el('div', { class: 'device-actions' },
           el('button', { class: 'btn btn-primary btn-sm', dataset: { devApprove: '1' } },
             d.status === 'approved' ? 'Edit access' : 'Approve'),
-          el('button', { class: 'btn btn-ghost btn-sm danger', dataset: { devRevoke: '1' } }, 'Revoke'),
+          d.status === 'revoked'
+            ? null
+            : el('button', { class: 'btn btn-ghost btn-sm danger', dataset: { devRevoke: '1' } }, 'Revoke'),
+          el('button', { class: 'btn btn-ghost btn-sm danger', dataset: { devRemove: '1' } }, 'Remove'),
         ),
       ),
       el('div', { class: 'device-sub muted' },
@@ -2716,6 +2756,13 @@ async function onDeviceClick(e) {
   if (e.target.closest('[data-dev-revoke]')) {
     if (!confirm('Revoke this device? It will lose access immediately.')) return;
     try { await api(`/api/admin/devices/${id}/revoke`, { method: 'POST' }); loadDevices(); }
+    catch (err) { toast(err.message, 'error'); }
+    return;
+  }
+  if (e.target.closest('[data-dev-remove]')) {
+    const who = dev && dev.username ? ` "${dev.username}"` : '';
+    if (!confirm(`Permanently remove this device${who}? This deletes the entry entirely.`)) return;
+    try { await api(`/api/admin/devices/${id}`, { method: 'DELETE' }); loadDevices(); }
     catch (err) { toast(err.message, 'error'); }
     return;
   }

@@ -70,6 +70,29 @@ def approve_device(device_id: int, payload: dict = Body(default={}), device=Depe
         conn.close()
 
 
+@router.delete("/devices/{device_id}")
+def delete_device(device_id: int, device=Depends(_admin)):
+    """Permanently remove a device entry (clear stale/revoked devices).
+
+    Guard: refuse to remove the last approved admin, so the hub can't be locked
+    out. Deleting your own device just logs this browser out (a new visit
+    re-registers as a pending guest).
+    """
+    conn = db.connect()
+    try:
+        target = db.get_device(conn, device_id)
+        if target is None:
+            raise HubError(404, "Device not found", "not_found")
+        if (target["role"] == "admin" and target["status"] == "approved"
+                and db.count_admins(conn) <= 1):
+            raise HubError(400, "Can't remove the last admin — make another "
+                           "device admin first.", "last_admin")
+        db.delete_device(conn, device_id)
+        return {"ok": True, "id": device_id}
+    finally:
+        conn.close()
+
+
 @router.post("/devices/{device_id}/revoke")
 def revoke_device(device_id: int, device=Depends(_admin)):
     conn = db.connect()
