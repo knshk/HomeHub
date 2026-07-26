@@ -150,12 +150,17 @@
   <div id="app" class="app" hidden>
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="topbar-brand">
+        <!-- Back to the launcher (phone widths, when inside a feature) -->
+        <button id="nav-back" class="icon-btn nav-back" title="Back to home" aria-label="Back to home" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+
+        <button id="brand-home" class="topbar-brand" type="button" title="Home">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg>
           </span>
-          <span class="brand-name">Home Hub<small>on your WiFi</small></span>
-        </div>
+          <span class="brand-name">Home Hub</span>
+        </button>
 
         <div class="topbar-spacer"></div>
 
@@ -226,7 +231,34 @@
     <main class="content">
 
       <!-- ---------------- CHAT ---------------- -->
+      <!-- ---------------- LAUNCHER (home) ---------------- -->
+      <!-- The landing screen: every feature as a tile, grouped by why you'd open
+           it. Tiles are built in JS from the same privilege rules as the tabs, so
+           nothing can appear here that the tab rail wouldn't also allow. -->
+      <section class="panel" id="panel-launcher" data-tab="launcher" hidden>
+        <div class="lc-head">
+          <h1 class="lc-greet" id="lc-greet">Welcome</h1>
+          <p class="lc-status" id="lc-status"></p>
+        </div>
+        <div id="lc-install-slot"></div>
+        <div id="lc-groups"></div>
+      </section>
+
       <section class="panel" id="panel-chat" data-tab="chat" hidden>
+        <!-- Compact chat header: model + history as chips (phone), so the
+             conversation gets the screen. Desktop keeps the sidebar as well. -->
+        <div class="ch-bar" id="ch-bar">
+          <span class="ch-title">Chat</span>
+          <span class="topbar-spacer"></span>
+          <button type="button" id="chat-model-chip" class="mini-chip on" hidden>
+            <span class="txt" id="chat-model-chip-txt">model</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button type="button" id="chat-history-chip" class="mini-chip" title="Your chats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+            <span class="txt" id="chat-history-count">0</span>
+          </button>
+        </div>
         <div class="chat-layout">
           <aside class="chat-sidebar" id="chat-sidebar">
             <div class="sidebar-head">
@@ -491,6 +523,12 @@
       <div id="modal-body"></div>
     </div>
   </div>
+
+  <!-- Sheet scrim: dims the page while a bottom sheet (chat history / model
+       picker) is open at phone widths. Tapping it closes the sheet. The sheets
+       themselves are the EXISTING .chat-sidebar / .composer-model nodes, which
+       CSS re-presents as sheets — so their ids and handlers stay untouched. -->
+  <div id="sheet-scrim" class="sheet-scrim" hidden></div>
 
   <!-- Toast host -->
   <div id="toast-root" class="toast-root toasts" aria-live="polite"></div>

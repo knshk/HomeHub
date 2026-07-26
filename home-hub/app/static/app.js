@@ -166,7 +166,14 @@ function setupPWA() {
   if (iosSafari && localStorage.getItem('hub-pwa-ios-dismissed') !== '1') setTimeout(() => showInstallBanner('ios'), 1500);
 }
 
+/* The install offer is now a tile in the launcher grid (see renderInstallTile)
+ * rather than a pill floating over the page. Kept as the entry point so the
+ * existing beforeinstallprompt / iOS call sites need no change. */
 function showInstallBanner(kind) {
+  renderInstallTile();
+}
+
+function showInstallBannerLegacy(kind) {
   if (document.getElementById('pwa-install')) return;
   const bar = el('div', { id: 'pwa-install', class: 'pwa-install' });
   if (kind === 'prompt') {
@@ -253,7 +260,11 @@ function openSettings() {
     modeRow,
     settingsInstallSection(),
     settingsAdminSection(),
-    el('div', { class: 'modal-actions' }, el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Done')),
+    el('div', { class: 'modal-actions' },
+      // Log out lives here now instead of taking a permanent slot in the top bar.
+      // Delegating to the existing button reuses its exact logic.
+      el('button', { class: 'btn btn-ghost', onclick: () => { closeModal(); $('#logout-btn').click(); } }, 'Log out'),
+      el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Done')),
   ));
 }
 
@@ -400,6 +411,22 @@ function wireGlobalUI() {
     const btn = e.target.closest('.tab');
     if (btn && !btn.disabled) selectTab(btn.dataset.tab);
   });
+
+  // Launcher: brand mark and the back arrow both return home; tiles open a feature.
+  $('#brand-home')?.addEventListener('click', goHome);
+  $('#nav-back')?.addEventListener('click', goHome);
+  $('#lc-groups')?.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-lc-tab]');
+    if (t) selectTab(t.dataset.lcTab);
+  });
+
+  // Chat header chips open the bottom sheets; anything conclusive closes them.
+  $('#chat-model-chip')?.addEventListener('click', () => openSheet('model'));
+  $('#chat-history-chip')?.addEventListener('click', () => openSheet('history'));
+  $('#sheet-scrim')?.addEventListener('click', closeSheets);
+  $('#conversation-list')?.addEventListener('click', closeSheets);
+  $('#chat-model')?.addEventListener('change', () => { syncChatChips(); closeSheets(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
 
   // Logout
   $('#logout-btn').addEventListener('click', async () => {
@@ -686,9 +713,11 @@ function onMe(me) {
   $('#gate').hidden = true;
   $('#app').hidden = false;
 
-  // user badge
+  // user badge — full text on desktop; CSS shows just the initial on phones
   $('#me-badge').textContent = `${me.username} · ${me.role}`;
   $('#me-badge').dataset.role = me.role;
+  $('#me-badge').dataset.initial = (me.username || '?').trim().charAt(0).toUpperCase();
+  $('#me-badge').title = `${me.username} · ${me.role}`;
 
   // status banner (pending / revoked)
   const banner = $('#status-banner');
@@ -704,9 +733,10 @@ function onMe(me) {
 
   renderTabs();
 
-  // Pick first visible tab
-  const firstVisible = $$('#tabs .tab').find((t) => !t.hidden);
-  if (firstVisible) selectTab(firstVisible.dataset.tab);
+  // Land on the launcher (home screen) — it lists every feature this device may
+  // use, so it works even for a pending guest with a single privilege.
+  const anyFeature = $$('#tabs .tab').some((t) => !t.hidden);
+  if (anyFeature) selectTab('launcher');
   else {
     // No privileges yet (pending guest with nothing) — show banner only
     $$('.panel').forEach((p) => (p.hidden = true));
@@ -719,6 +749,8 @@ function onMe(me) {
 }
 
 function tabAllowed(tab) {
+  // The launcher is the home screen — always reachable for a registered device.
+  if (tab === 'launcher') return true;
   const btn = $(`#tabs .tab[data-tab="${tab}"]`);
   if (!btn) return false;
   if (btn.dataset.role === 'admin') return isAdmin();
@@ -749,6 +781,8 @@ async function checkStatus() {
 
 function applyStatusUI() {
   const st = State.status;
+  // Keep the launcher's status line live while it's on screen.
+  if (State.activeTab === 'launcher') renderLauncherStatus();
   // Offline banner (only when the device is approved; pending has its own banner).
   const banner = $('#offline-banner');
   if (banner && State.me && State.me.status === 'approved') {
@@ -789,6 +823,189 @@ function renderTabs() {
   });
 }
 
+/* ===========================================================================
+ * LAUNCHER — the home screen.
+ * Tiles are DERIVED from the tab rail: same buttons, same icons, same privilege
+ * gating (tabAllowed). A feature therefore cannot exist in one and be missing
+ * from the other, and any tab not explicitly grouped still gets a tile under
+ * "More" — so nothing can become unreachable.
+ * ========================================================================= */
+const LC_GROUPS = [
+  { label: null,          tabs: ['chat', 'calendar', 'home', 'notes', 'checklists'] },
+  { label: 'Create',      tabs: ['images', 'studio'] },
+  { label: 'Household',   tabs: ['files', 'keys'] },
+  { label: 'Admin only',  tabs: ['admin', 'models'], small: true },
+];
+
+const LC_HINTS = {
+  chat: 'Ask anything',
+  calendar: 'Events & chores',
+  home: 'Lights, locks, sensors',
+  notes: 'Shared noticeboard',
+  checklists: 'Lists for the house',
+  images: 'Create pictures',
+  studio: 'Art & animation',
+  files: 'Upload, browse, search',
+  keys: 'Keys for other apps',
+  admin: 'People & devices',
+  models: 'Models & metrics',
+};
+
+/** Label + icon lifted from the matching tab button (single source of truth). */
+function lcTabMeta(tab) {
+  const btn = $(`#tabs .tab[data-tab="${tab}"]`);
+  if (!btn) return null;
+  const span = btn.querySelector('span');
+  const svg = btn.querySelector('svg');
+  return {
+    label: (span ? span.textContent : tab).trim(),
+    icon: svg ? svg.cloneNode(true) : null,
+  };
+}
+
+function lcHint(tab) {
+  // Live counts only where the data is already in memory — otherwise a plain
+  // description, which is always accurate and costs no extra request.
+  if (tab === 'chat' && State.conversations.length) {
+    const n = State.conversations.length;
+    return `${n} chat${n === 1 ? '' : 's'}`;
+  }
+  return LC_HINTS[tab] || '';
+}
+
+function lcTile(tab, opts = {}) {
+  const meta = lcTabMeta(tab);
+  if (!meta) return null;
+  const tile = el('button', {
+    type: 'button',
+    class: 'lc-tile' + (opts.wide ? ' wide' : '') + (opts.small ? ' small' : ''),
+    dataset: { lcTab: tab },
+  });
+  if (meta.icon) tile.append(el('span', { class: 'ic' }, meta.icon));
+  if (opts.wide) {
+    tile.append(el('span', { class: 'lc-txt' },
+      el('span', { class: 'lc-name' }, meta.label),
+      el('span', { class: 'lc-hint' }, lcHint(tab))));
+  } else {
+    tile.append(el('span', { class: 'lc-name' }, meta.label));
+    if (!opts.small) tile.append(el('span', { class: 'lc-hint' }, lcHint(tab)));
+  }
+  return tile;
+}
+
+function renderLauncher() {
+  if (!State.me) return;
+  const h = new Date().getHours();
+  const part = h < 12 ? 'Good morning' : (h < 18 ? 'Good afternoon' : 'Good evening');
+  $('#lc-greet').textContent = `${part}, ${State.me.username}`;
+  renderLauncherStatus();
+
+  const host = $('#lc-groups');
+  host.replaceChildren();
+  const placed = new Set();
+
+  for (const g of LC_GROUPS) {
+    const tiles = [];
+    g.tabs.forEach((tab, i) => {
+      if (!tabAllowed(tab)) return;
+      // First everyday tile spans the row — it's the primary thing you came for.
+      const t = lcTile(tab, { wide: g.label === null && i === 0, small: g.small });
+      if (t) { tiles.push(t); placed.add(tab); }
+    });
+    if (!tiles.length) continue;
+    if (g.label) host.append(el('p', { class: 'lc-grouplbl' }, g.label));
+    host.append(el('div', { class: 'lc-grid' + (g.small ? ' three' : '') }, ...tiles));
+  }
+
+  // Safety net: an ungrouped (e.g. newly added) tab still gets a tile.
+  const spare = $$('#tabs .tab')
+    .map((b) => b.dataset.tab)
+    .filter((t) => t && !placed.has(t) && tabAllowed(t));
+  if (spare.length) {
+    host.append(el('p', { class: 'lc-grouplbl' }, 'More'));
+    host.append(el('div', { class: 'lc-grid' }, ...spare.map((t) => lcTile(t)).filter(Boolean)));
+  }
+
+  renderInstallTile();
+}
+
+function renderLauncherStatus() {
+  const node = $('#lc-status');
+  if (!node) return;
+  const st = State.status || {};
+  const bits = [st.chat ? 'AI ready' : 'AI offline'];
+  if (st.images) bits.push('Image Studio on');
+  if (st.voice) bits.push('Voice ready');
+  node.replaceChildren(
+    el('span', { class: 'lc-dot' + (st.chat ? '' : ' off') }),
+    el('span', {}, bits.join(' · ')));
+}
+
+/** Install offer as a calm tile in the launcher grid (replaces the floating pill). */
+function renderInstallTile() {
+  const slot = $('#lc-install-slot');
+  if (!slot) return;
+  slot.replaceChildren();
+  const installed = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if (installed) return;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (!_deferredInstall && !isIOS) return;   // nothing actionable to offer yet
+  slot.append(el('button', {
+    type: 'button', class: 'lc-tile wide lc-install',
+    onclick: () => { if (_deferredInstall) doInstall(); else openSettings(); },
+  },
+    el('span', { class: 'ic', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>' }),
+    el('span', { class: 'lc-txt' },
+      el('span', { class: 'lc-name' }, 'Add to your home screen'),
+      el('span', { class: 'lc-hint' }, _deferredInstall
+        ? 'Opens like an app, works offline'
+        : 'Tap Share, then “Add to Home Screen”'))));
+}
+
+/* ---- navigation helpers ---- */
+function goHome() { selectTab('launcher'); }
+
+function updateNavBack() {
+  const back = $('#nav-back');
+  if (back) back.hidden = !(State.activeTab && State.activeTab !== 'launcher');
+}
+
+/* ---- bottom sheets (phone): chat history + model picker ----
+ * These re-present the EXISTING #conversation-list sidebar and #chat-model-bar
+ * via CSS. No DOM is moved and no ids change, so every existing handler — and
+ * the admin-only `hidden` flag on the model bar — keeps working untouched. */
+function openSheet(kind) {
+  document.body.classList.remove('sheet-history', 'sheet-model');
+  document.body.classList.add(kind === 'model' ? 'sheet-model' : 'sheet-history');
+  const scrim = $('#sheet-scrim');
+  if (scrim) scrim.hidden = false;
+}
+
+function closeSheets() {
+  document.body.classList.remove('sheet-history', 'sheet-model');
+  const scrim = $('#sheet-scrim');
+  if (scrim) scrim.hidden = true;
+}
+
+/** Keep the header chips in step with the model select and the chat list. */
+function syncChatChips() {
+  const bar = $('#chat-model-bar');
+  const sel = $('#chat-model');
+  const chip = $('#chat-model-chip');
+  if (chip && bar) {
+    // Mirror the admin-only gating of the model bar — never widen access.
+    chip.hidden = bar.hidden;
+    const txt = $('#chat-model-chip-txt');
+    if (txt && sel) {
+      const opt = sel.options[sel.selectedIndex];
+      txt.textContent = (opt && opt.textContent.trim()) || 'Default model';
+    }
+  }
+  const count = $('#chat-history-count');
+  if (count) count.textContent = String(State.conversations.length || 0);
+}
+
 function selectTab(tab) {
   if (!tabAllowed(tab)) return;
   State.activeTab = tab;
@@ -796,8 +1013,11 @@ function selectTab(tab) {
   if (tab !== 'images') stopGenPoll();
   $$('#tabs .tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
   $$('.panel').forEach((p) => (p.hidden = p.dataset.tab !== tab));
+  closeSheets();                 // never leave a sheet open across a tab change
+  updateNavBack();               // show "back" only when away from the launcher
 
   switch (tab) {
+    case 'launcher':   renderLauncher(); break;
     case 'chat':       loadConversations(); break;
     case 'notes':      loadNotes(); break;
     case 'checklists': loadChecklists(); break;
@@ -1154,7 +1374,7 @@ function renderChatModelSelect() {
   const bar = $('#chat-model-bar');
   const sel = $('#chat-model');
   if (!bar || !sel) return;
-  if (!isAdmin() || !State.chatModels.length) { bar.hidden = true; return; }
+  if (!isAdmin() || !State.chatModels.length) { bar.hidden = true; syncChatChips(); return; }
   const current = State.convModel[State.activeConvId] || '';
   sel.innerHTML = '';
   sel.append(el('option', { value: '' }, 'House default'));
@@ -1166,6 +1386,7 @@ function renderChatModelSelect() {
   }
   bar.hidden = false;
   updateCloudNotice();
+  syncChatChips();
 }
 
 function updateCloudNotice() {
@@ -1206,6 +1427,7 @@ function renderConversationList() {
     );
     ul.append(li);
   }
+  syncChatChips();   // keep the history-count chip truthful
 }
 
 async function newConversation() {

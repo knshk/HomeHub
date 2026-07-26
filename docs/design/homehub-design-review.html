@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeHub PWA — Density Review &amp; Launcher Proposal</title>
+<!-- Standalone local copy. Fully self-contained: no external fonts, scripts or images. -->
+</head>
+<body>
+<style>
+  /* ==========================================================================
+     REVIEW CHROME — one committed dark "workbench", the way design tools present
+     artboards. Specimens inside carry both themes and switch live. Chrome tokens
+     are --rv-*; app specimens use HomeHub's own tokens scoped to .app[...], so
+     the two cascades never touch.
+     ========================================================================== */
+  :root {
+    --rv-ink:#14161B; --rv-panel:#1C1F26; --rv-panel2:#23272F; --rv-line:#2B303A;
+    --rv-paper:#E9ECF2; --rv-dim:#868D9C;
+    --rv-mark:#35C4B5;                     /* annotation ink */
+    --rv-bad:#F0796B;                      /* as-is problem */
+    --rv-good:#7BE0A8;                     /* proposed / strength */
+    --rv-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --rv-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--rv-ink); color:var(--rv-paper);
+    font-family:var(--rv-sans); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1120px; margin:0 auto; padding:0 20px 96px; }
+
+  .mast { padding:52px 0 26px; border-bottom:1px solid var(--rv-line); }
+  .kicker { font-family:var(--rv-mono); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--rv-mark); margin:0 0 14px; }
+  h1 { font-size:clamp(1.9rem,1.4rem + 2vw,2.6rem); line-height:1.1; margin:0 0 14px;
+    letter-spacing:-.02em; text-wrap:balance; font-weight:650; }
+  .lede { color:var(--rv-dim); max-width:64ch; margin:0; }
+  .lede strong { color:var(--rv-paper); font-weight:600; }
+  .howto { margin:22px 0 0; padding:14px 16px; border:1px solid var(--rv-line);
+    border-left:2px solid var(--rv-mark); border-radius:0 8px 8px 0;
+    background:var(--rv-panel); font-size:14px; color:var(--rv-dim); }
+  .howto code { font-family:var(--rv-mono); font-size:12.5px; color:var(--rv-mark);
+    background:rgba(53,196,181,.09); padding:1px 5px; border-radius:4px; }
+
+  section { padding:44px 0 8px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 6px; flex-wrap:wrap; }
+  .sec-head h2 { font-size:1.35rem; margin:0; font-weight:650; letter-spacing:-.01em; }
+  .sec-num { font-family:var(--rv-mono); font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--rv-mark); }
+  .sec-num.bad { color:var(--rv-bad); }
+  .sec-num.good { color:var(--rv-good); }
+  .sec-note { color:var(--rv-dim); font-size:14px; max-width:70ch; margin:0 0 26px; }
+
+  .anchor { display:inline-flex; align-items:center; justify-content:center;
+    min-width:30px; height:20px; padding:0 6px; font-family:var(--rv-mono);
+    font-size:11px; font-weight:600; font-variant-numeric:tabular-nums;
+    letter-spacing:.04em; color:var(--rv-ink); background:var(--rv-mark);
+    border-radius:4px; flex:0 0 auto; user-select:all; }
+  .anchor.a { background:var(--rv-bad); }
+  .anchor.p { background:var(--rv-good); }
+  .anchor.ghost { color:var(--rv-mark); background:rgba(53,196,181,.12); }
+
+  .item-head { display:flex; align-items:center; gap:10px; margin:0 0 10px; flex-wrap:wrap; }
+  .item-head h3 { font-size:14px; margin:0; font-weight:620; }
+  .item-head .sub { color:var(--rv-dim); font-size:12.5px; font-family:var(--rv-mono); }
+
+  .rail { position:sticky; top:0; z-index:20; margin:0 -20px; padding:12px 20px;
+    background:rgba(20,22,27,.87); backdrop-filter:blur(10px) saturate(140%);
+    border-bottom:1px solid var(--rv-line);
+    display:flex; flex-wrap:wrap; gap:18px; align-items:center; }
+  .rail-grp { display:flex; align-items:center; gap:8px; }
+  .rail-lbl { font-family:var(--rv-mono); font-size:10.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--rv-dim); }
+  .seg { display:inline-flex; border:1px solid var(--rv-line); border-radius:8px; overflow:hidden; }
+  .seg button { appearance:none; border:0; background:transparent; color:var(--rv-dim);
+    font:inherit; font-size:13px; font-weight:550; padding:7px 13px; cursor:pointer;
+    transition:background .15s ease,color .15s ease; }
+  .seg button + button { border-left:1px solid var(--rv-line); }
+  .seg button[aria-pressed="true"] { background:var(--rv-mark); color:var(--rv-ink); font-weight:650; }
+  .seg button:hover:not([aria-pressed="true"]) { background:var(--rv-panel2); color:var(--rv-paper); }
+  :where(button,a,[tabindex]):focus-visible { outline:2px solid var(--rv-mark); outline-offset:2px; border-radius:4px; }
+
+  .screens { display:grid; gap:26px; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); }
+  .screen { min-width:0; }
+  .phone { border:1px solid var(--rv-line); border-radius:26px; padding:8px;
+    background:linear-gradient(180deg,#2A2F39,#1A1D24); box-shadow:0 22px 44px rgba(0,0,0,.42); }
+  .phone-inner { border-radius:19px; overflow:hidden; background:#000; position:relative; }
+  .phone.flag-bad { border-color:rgba(240,121,107,.45); }
+  .phone.flag-good { border-color:rgba(123,224,168,.4); }
+  .statusbar { display:flex; align-items:center; justify-content:space-between;
+    padding:5px 14px 4px; font-family:var(--rv-mono); font-size:10px;
+    color:var(--muted); background:var(--bg); }
+  .statusbar .dots { display:flex; gap:3px; }
+  .statusbar .dots i { width:4px; height:4px; border-radius:50%; background:var(--muted); display:block; }
+  .cap { color:var(--rv-dim); font-size:13px; margin:10px 0 0; }
+  .cap b { color:var(--rv-paper); font-weight:600; }
+  .cap .hl { color:var(--rv-bad); font-weight:600; }
+  .cap .hlg { color:var(--rv-good); font-weight:600; }
+
+  /* measurement overlay: shows chrome height eaten before content */
+  .measure { position:absolute; left:0; right:0; pointer-events:none;
+    border-top:1px dashed rgba(240,121,107,.75); border-bottom:1px dashed rgba(240,121,107,.75);
+    background:rgba(240,121,107,.10); }
+  .measure span { position:absolute; right:5px; top:50%; transform:translateY(-50%);
+    font-family:var(--rv-mono); font-size:9px; font-weight:700; color:#fff;
+    background:var(--rv-bad); padding:1px 5px; border-radius:3px; white-space:nowrap; }
+
+  .tbl-scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; min-width:520px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--rv-line); vertical-align:top; }
+  th { font-family:var(--rv-mono); font-size:10.5px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--rv-dim); font-weight:500; }
+  td.mono { font-family:var(--rv-mono); font-size:12.5px; font-variant-numeric:tabular-nums; }
+  td.now { color:var(--rv-bad); }
+  td.next { color:var(--rv-good); }
+
+  .obs { display:grid; gap:12px; }
+  .ob { display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start;
+    padding:15px 16px; border:1px solid var(--rv-line); border-radius:10px; background:var(--rv-panel); }
+  .ob h4 { margin:0 0 5px; font-size:14.5px; font-weight:620; }
+  .ob p { margin:0; color:var(--rv-dim); font-size:13.5px; }
+  .ob p + p { margin-top:7px; }
+  .ob .fix { color:var(--rv-paper); }
+  .ob .fix b { color:var(--rv-good); font-weight:600; }
+  .ob code, .cap code, .sec-note code { font-family:var(--rv-mono); font-size:12.5px; color:var(--rv-mark); }
+
+  .sheet { border:1px dashed var(--rv-line); border-radius:12px; padding:20px; background:var(--rv-panel); }
+  .sheet ul { margin:12px 0 0; padding:0; list-style:none; display:grid; gap:9px; }
+  .sheet li { display:flex; gap:11px; align-items:center; color:var(--rv-dim); font-size:13.5px; }
+  .rule { height:1px; flex:1; background:var(--rv-line); }
+  footer { margin-top:52px; padding-top:20px; border-top:1px solid var(--rv-line);
+    color:var(--rv-dim); font-size:13px; }
+  footer code { font-family:var(--rv-mono); }
+
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
+
+  /* ==========================================================================
+     APP SPECIMENS — HomeHub's real tokens, verbatim from style.css
+     ========================================================================== */
+  .app {
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+    --fs-xs:0.78rem; --fs-sm:0.875rem; --fs-md:1rem; --fs-lg:1.125rem; --fs-xl:1.375rem;
+    --r-sm:10px; --r-md:14px; --r-lg:18px; --r-card:20px; --r-pill:999px;
+    --shadow-sm:0 1px 2px rgba(20,24,40,.06),0 1px 3px rgba(20,24,40,.05);
+    --shadow-md:0 4px 14px rgba(20,24,40,.08),0 2px 6px rgba(20,24,40,.05);
+    --shadow-lg:0 18px 50px rgba(20,24,40,.22);
+    --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-head:ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif;
+    --tap:44px;
+    --note-default:#F1F3F8; --note-yellow:#FDE8B5; --note-green:#CFE9D6;
+    --note-blue:#CFE0FB; --note-pink:#F6D2D6; --note-purple:#E7D7F4;
+    font-family:var(--font-body); color:var(--text); background:var(--bg);
+    font-size:15px; line-height:1.5;
+  }
+  .app[data-palette="greenhouse"] { --font-head:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --r-sm:8px; --r-md:12px; --r-lg:14px; --r-card:16px; }
+  .app[data-palette="hearth"] { --font-head:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --r-sm:7px; --r-md:10px; --r-lg:13px; --r-card:14px; }
+  .app[data-palette="cubby"][data-theme="light"] {
+    --bg:#EEF0F4; --bg-grad:#E7EAF2; --surface:#FFFFFF; --surface-2:#F5F7FB; --surface-3:#EDEFF6;
+    --text:#1E2333; --muted:#5B6378; --faint:#8A93A8; --border:#DCE0EB; --border-strong:#C7CDDC;
+    --accent:#3B5BD9; --accent-ink:#FFFFFF; --accent-soft:#E3E9FC; --accent-2:#5B78E8;
+    --pop:#F2B632; --pop-soft:#FCEFCB; --danger:#D6453B; --danger-soft:#FBE2E0;
+    --success:#2E9E6B; --success-soft:#DBF1E6; }
+  .app[data-palette="cubby"][data-theme="dark"] {
+    --bg:#141824; --bg-grad:#11151F; --surface:#1E2431; --surface-2:#262E3E; --surface-3:#2E3850;
+    --text:#EAEDF6; --muted:#9BA4BA; --faint:#717C95; --border:#303A4E; --border-strong:#3C4862;
+    --accent:#7B92F2; --accent-ink:#0E1320; --accent-soft:#283460; --accent-2:#94A6F6;
+    --pop:#F2B632; --pop-soft:#3D341B; --danger:#F0786E; --danger-soft:#3A2220;
+    --success:#4FC089; --success-soft:#163127; }
+  .app[data-palette="greenhouse"][data-theme="light"] {
+    --bg:#EAEFE7; --bg-grad:#E1E8DC; --surface:#FFFFFF; --surface-2:#F4F7F1; --surface-3:#E9EFE5;
+    --text:#1E332A; --muted:#56695C; --faint:#84957F; --border:#D5DECF; --border-strong:#C2CEB9;
+    --accent:#356B57; --accent-ink:#FFFFFF; --accent-soft:#DCE8DF; --accent-2:#4E8B70;
+    --pop:#E0A56B; --pop-soft:#F6E7D4; --danger:#C0533F; --danger-soft:#F4E0D9;
+    --success:#3E8E5E; --success-soft:#DCEEE1; }
+  .app[data-palette="greenhouse"][data-theme="dark"] {
+    --bg:#14201A; --bg-grad:#101A15; --surface:#1C2A23; --surface-2:#233129; --surface-3:#2B3B31;
+    --text:#E7EFE7; --muted:#93A799; --faint:#6E8273; --border:#2C3D33; --border-strong:#3A4F42;
+    --accent:#62A786; --accent-ink:#0C1611; --accent-soft:#21382D; --accent-2:#7BB89A;
+    --pop:#E0A56B; --pop-soft:#382C1F; --danger:#E08571; --danger-soft:#36231D;
+    --success:#5BB07E; --success-soft:#15291E; }
+  .app[data-palette="hearth"][data-theme="light"] {
+    --bg:#F4EDE1; --bg-grad:#EFE5D5; --surface:#FFFBF4; --surface-2:#F7F0E4; --surface-3:#F0E6D6;
+    --text:#2B2118; --muted:#6E6052; --faint:#9A8B79; --border:#E4D8C6; --border-strong:#D6C7B0;
+    --accent:#C2673B; --accent-ink:#FFFFFF; --accent-soft:#F1DFD1; --accent-2:#D0794E;
+    --pop:#5C7A6B; --pop-soft:#DDE7E0; --danger:#B24A3A; --danger-soft:#F2DCD6;
+    --success:#4E7A52; --success-soft:#DEE9DD; }
+  .app[data-palette="hearth"][data-theme="dark"] {
+    --bg:#211C16; --bg-grad:#1A150F; --surface:#2B251D; --surface-2:#342D24; --surface-3:#3E3528;
+    --text:#F1E9DC; --muted:#B3A593; --faint:#897C6A; --border:#3D352A; --border-strong:#4C4234;
+    --accent:#DB8458; --accent-ink:#1A140E; --accent-soft:#3A2D22; --accent-2:#E39A72;
+    --pop:#88A38F; --pop-soft:#2A352E; --danger:#E08571; --danger-soft:#382420;
+    --success:#7FAA82; --success-soft:#25301F; }
+
+  /* --- shared app component rules (mirror style.css) --- */
+  .app .screenbody { padding:var(--sp-3); background:var(--bg); }
+  .app .brand-mark { color:var(--accent); display:flex; }
+  .app .brand-mark svg { width:22px; height:22px; }
+  .app .brand-name { font-size:var(--fs-md); font-family:var(--font-head); font-weight:700; line-height:1.12; }
+  .app .brand-name small { display:block; font-size:9.5px; font-weight:500; color:var(--faint); }
+  .app .topbar-spacer { flex:1; }
+  .app .icon-btn { display:inline-flex; align-items:center; justify-content:center;
+    width:34px; height:34px; flex:0 0 auto; padding:0; border:1.5px solid transparent;
+    border-radius:var(--r-md); background:var(--surface-2); color:var(--text); }
+  .app .icon-btn svg { width:17px; height:17px; }
+  .app .user-badge { display:inline-flex; align-items:center; height:30px; padding:0 10px;
+    border-radius:var(--r-pill); background:var(--surface-2); color:var(--text);
+    font-size:var(--fs-xs); font-weight:600; white-space:nowrap; }
+  .app .avatar { display:inline-grid; place-items:center; width:32px; height:32px; flex:0 0 auto;
+    border-radius:50%; background:var(--accent); color:var(--accent-ink);
+    font-size:var(--fs-xs); font-weight:800; }
+
+  .app .topbar { background:var(--bg); border-bottom:1px solid var(--border); }
+  .app .topbar-inner { padding:8px var(--sp-3); display:flex; align-items:center; gap:var(--sp-2); }
+  .app .navwrap { border-top:1px solid var(--border); }
+  .app .tabs { padding:7px var(--sp-3); display:flex; gap:var(--sp-2); overflow:hidden; }
+  .app .tab { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 12px;
+    border-radius:var(--r-md); border:1.5px solid transparent; background:transparent;
+    color:var(--muted); font-weight:600; font-size:var(--fs-sm); white-space:nowrap;
+    font-family:inherit; flex:0 0 auto; }
+  .app .tab.active { background:var(--surface); color:var(--accent); box-shadow:var(--shadow-sm); border-color:var(--border); }
+  .app .tab svg { width:15px; height:15px; }
+
+  .app .eyebrow { font-size:var(--fs-xs); font-weight:800; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--accent); }
+  .app h2.ph { font-size:var(--fs-lg); margin:2px 0 0; font-family:var(--font-head);
+    font-weight:700; letter-spacing:-.01em; }
+  .app .panel-head { display:flex; align-items:center; justify-content:space-between;
+    gap:var(--sp-2); margin-bottom:var(--sp-3); }
+
+  .app .btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2);
+    min-height:36px; padding:0 14px; border:1.5px solid transparent; border-radius:var(--r-md);
+    background:var(--surface-2); color:var(--text); font-weight:600; font-size:var(--fs-sm);
+    font-family:inherit; white-space:nowrap; }
+  .app .btn-primary { background:var(--accent); color:var(--accent-ink); box-shadow:var(--shadow-sm); }
+  .app .btn-ghost { background:transparent; border-color:var(--border-strong); color:var(--text); }
+  .app .btn-sm { min-height:30px; padding:0 11px; font-size:var(--fs-xs); }
+  .app .btn-block { width:100%; }
+  .app .field { display:block; width:100%; min-height:40px; padding:0 12px;
+    border:1.5px solid var(--border-strong); border-radius:var(--r-md);
+    background:var(--surface); color:var(--text); font-size:var(--fs-sm); font-family:inherit; }
+  .app .field-label { display:block; font-size:var(--fs-sm); font-weight:700; color:var(--muted); }
+  .app .tag { display:inline-flex; align-items:center; height:20px; padding:0 8px;
+    border-radius:var(--r-pill); font-size:var(--fs-xs); font-weight:700;
+    background:var(--surface-3); color:var(--muted); }
+  .app .muted { color:var(--muted); font-size:var(--fs-sm); }
+  .app .empty-hint { color:var(--muted); text-align:center; padding:var(--sp-5) var(--sp-3); font-size:var(--fs-sm); }
+  .app .card { background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-card); padding:var(--sp-3); box-shadow:var(--shadow-sm); }
+  .app .stack { display:flex; flex-wrap:wrap; gap:var(--sp-2); align-items:center; }
+
+  /* chat (as-is) */
+  .app .chat-sidebar { background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-card); box-shadow:var(--shadow-sm); padding:var(--sp-3); margin-bottom:var(--sp-3); }
+  .app .sidebar-head { display:flex; align-items:center; justify-content:space-between;
+    gap:var(--sp-2); margin-bottom:var(--sp-2); }
+  .app .sidebar-head h2 { margin:0; font-size:var(--fs-md); font-family:var(--font-head); font-weight:700; }
+  .app .conv-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:3px; }
+  .app .conv-item { display:flex; align-items:center; gap:var(--sp-2); padding:7px 9px;
+    border-radius:var(--r-md); font-size:var(--fs-sm); }
+  .app .conv-item.on { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .app .composer-model { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; padding:0 4px var(--sp-2); }
+  .app .chat-model-select { min-height:34px; padding:0 10px; border:1.5px solid var(--border-strong);
+    border-radius:var(--r-sm); background:var(--surface); color:var(--text); font-size:var(--fs-sm);
+    font-family:inherit; flex:1; min-width:0; }
+  .app .composer { background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-card); box-shadow:var(--shadow-md); padding:var(--sp-3); margin-top:var(--sp-3); }
+  .app .composer-row { display:flex; align-items:flex-end; gap:var(--sp-2); }
+  .app .composer-row textarea { flex:1; min-width:0; min-height:38px; padding:9px 12px; resize:none;
+    border:1.5px solid var(--border-strong); border-radius:var(--r-md);
+    background:var(--surface); color:var(--text); font-size:var(--fs-sm); font-family:inherit; }
+  .app .msg { display:flex; flex-direction:column; margin-bottom:var(--sp-3); }
+  .app .msg-user { align-items:flex-end; }
+  .app .msg-head { font-size:var(--fs-xs); color:var(--faint); font-weight:700; margin-bottom:3px; }
+  .app .msg-body { max-width:86%; padding:9px 13px; border-radius:var(--r-lg); font-size:var(--fs-sm); line-height:1.45; }
+  .app .msg-user .msg-body { background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:6px; }
+  .app .msg-assistant .msg-body { background:var(--surface); border:1px solid var(--border); border-bottom-left-radius:6px; }
+
+  /* install banner (as-is: fixed pill, floats over content) */
+  .app .pwa-install { position:absolute; left:50%; transform:translateX(-50%); bottom:12px;
+    display:flex; align-items:center; gap:var(--sp-2); max-width:92%;
+    padding:9px 14px; border-radius:var(--r-pill); background:var(--surface);
+    color:var(--text); border:1px solid var(--border); box-shadow:var(--shadow-lg);
+    font-size:var(--fs-xs); font-weight:600; z-index:5; }
+
+  /* gate */
+  .app .gate { display:grid; place-items:center; padding:var(--sp-4) var(--sp-3);
+    background:linear-gradient(180deg,var(--bg),var(--bg-grad)); }
+  .app .gate-card { width:100%; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-card); box-shadow:var(--shadow-lg); padding:var(--sp-4) var(--sp-3); text-align:center; }
+  .app .gate-logo { color:var(--accent); display:grid; place-items:center; margin-bottom:var(--sp-2); }
+  .app .gate-logo svg { width:32px; height:32px; }
+  .app .gate-card h1 { font-family:var(--font-head); font-size:var(--fs-lg); margin:0 0 5px; font-weight:700; }
+  .app .gate-sub { color:var(--muted); font-size:var(--fs-xs); margin:0 0 var(--sp-3); }
+
+  /* ---------- PROPOSED: launcher ---------- */
+  .app .lc-head { padding:var(--sp-4) var(--sp-3) var(--sp-3); }
+  .app .lc-greet { font-family:var(--font-head); font-size:var(--fs-xl); font-weight:700;
+    margin:0; letter-spacing:-.01em; }
+  .app .lc-status { display:flex; align-items:center; gap:6px; margin-top:5px;
+    font-size:var(--fs-xs); color:var(--muted); }
+  .app .lc-dot { width:6px; height:6px; border-radius:50%; background:var(--success); flex:0 0 auto; }
+  .app .lc-grouplbl { font-size:var(--fs-xs); font-weight:800; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--faint); margin:var(--sp-4) 0 var(--sp-2); }
+  .app .lc-grid { display:grid; gap:var(--sp-2); grid-template-columns:1fr 1fr; }
+  .app .lc-grid.three { grid-template-columns:1fr 1fr 1fr; }
+  .app .lc-tile { display:flex; flex-direction:column; gap:3px; padding:var(--sp-3);
+    border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface);
+    box-shadow:var(--shadow-sm); text-align:left; font-family:inherit; }
+  .app .lc-tile .ic { color:var(--accent); display:flex; margin-bottom:2px; }
+  .app .lc-tile .ic svg { width:20px; height:20px; }
+  .app .lc-name { font-size:var(--fs-sm); font-weight:700; }
+  .app .lc-hint { font-size:var(--fs-xs); color:var(--muted); }
+  .app .lc-tile.wide { grid-column:1 / -1; flex-direction:row; align-items:center; gap:var(--sp-3); }
+  .app .lc-tile.wide .ic { margin:0; }
+  .app .lc-tile.wide .lc-txt { flex:1; min-width:0; }
+  .app .lc-badge { margin-left:auto; font-size:var(--fs-xs); font-weight:800; color:var(--accent);
+    background:var(--accent-soft); border-radius:var(--r-pill); padding:2px 8px; flex:0 0 auto; }
+  .app .lc-tile.small { padding:var(--sp-2) var(--sp-2); align-items:center; text-align:center; }
+  .app .lc-tile.small .lc-name { font-size:var(--fs-xs); }
+  .app .lc-tile.small .ic { margin:0 auto 3px; }
+
+  /* ---------- PROPOSED: chat header chips ---------- */
+  .app .ch-bar { display:flex; align-items:center; gap:var(--sp-2);
+    padding:7px var(--sp-3); background:var(--bg); border-bottom:1px solid var(--border); }
+  .app .ch-back { display:inline-grid; place-items:center; width:30px; height:30px; flex:0 0 auto;
+    border-radius:var(--r-md); background:var(--surface-2); color:var(--text); border:0; }
+  .app .ch-back svg { width:16px; height:16px; }
+  .app .ch-title { font-family:var(--font-head); font-size:var(--fs-md); font-weight:700; }
+  .app .mini-chip { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 9px;
+    border-radius:var(--r-pill); background:var(--surface-2); border:1px solid var(--border);
+    color:var(--muted); font-size:var(--fs-xs); font-weight:700; font-family:inherit; max-width:150px; }
+  .app .mini-chip.on { background:var(--accent-soft); border-color:transparent; color:var(--accent); }
+  .app .mini-chip svg { width:12px; height:12px; flex:0 0 auto; }
+  .app .mini-chip .txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---------- PROPOSED: history sheet ---------- */
+  .app .sheet-scrim { position:absolute; inset:0; background:rgba(10,12,18,.42); z-index:6; }
+  .app .sheet-panel { position:absolute; left:0; right:0; bottom:0; z-index:7;
+    background:var(--surface); border-top:1px solid var(--border);
+    border-radius:var(--r-card) var(--r-card) 0 0; padding:var(--sp-3);
+    box-shadow:var(--shadow-lg); }
+  .app .sheet-grip { width:34px; height:4px; border-radius:2px; background:var(--border-strong);
+    margin:0 auto var(--sp-3); }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">Design review v2 · measured from source</p>
+    <h1>You were right — here's the real thing, and a way out</h1>
+    <p class="lede">
+      The first board showed an idealised composition. This one is rebuilt from
+      <strong>index.html</strong> and <strong>style.css</strong> as they stand: the real two-row header, all
+      <strong>eleven tabs</strong>, the chat list that lands on top of your conversation, and the full-width
+      model picker. Then the proposal: <strong>a launcher home screen</strong>, so chat becomes somewhere you
+      choose to go rather than what you're dropped into.
+    </p>
+    <p class="howto">
+      <strong style="color:var(--rv-paper)">Reference chips:</strong> <code>A#</code> = the app as it is today ·
+      <code>P#</code> = proposed change. Reply like <code>P1: fewer groups</code> or <code>A3: agreed</code>
+      and I'll act on it. Palette and theme switch every specimen below.
+    </p>
+  </header>
+
+  <div class="rail">
+    <div class="rail-grp">
+      <span class="rail-lbl">Palette</span>
+      <div class="seg" id="pal">
+        <button type="button" data-pal="cubby" aria-pressed="true">Cubby</button>
+        <button type="button" data-pal="greenhouse" aria-pressed="false">Greenhouse</button>
+        <button type="button" data-pal="hearth" aria-pressed="false">Hearth</button>
+      </div>
+    </div>
+    <div class="rail-grp">
+      <span class="rail-lbl">Theme</span>
+      <div class="seg" id="thm">
+        <button type="button" data-thm="light" aria-pressed="true">Light</button>
+        <button type="button" data-thm="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+    <span class="rail-lbl" style="margin-left:auto">Live across all specimens</span>
+  </div>
+
+  <!-- ============================ AS IS ============================ -->
+  <section>
+    <div class="sec-head"><span class="sec-num bad">A — As it is today</span><h2>Where the crowding comes from</h2></div>
+    <p class="sec-note">
+      Four separate things stack up before you can do anything. Dashed red bands mark chrome —
+      pixels spent on navigation rather than content.
+    </p>
+
+    <div class="screens">
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor a">A1</span><h3>Two header rows + 11 tabs</h3></div>
+        <div class="phone flag-bad"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="topbar">
+              <div class="topbar-inner">
+                <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+                <span class="brand-name">Home Hub<small>on your WiFi</small></span>
+                <span class="topbar-spacer"></span>
+                <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                <span class="user-badge">alex · admin</span>
+                <button class="btn btn-ghost btn-sm">Log out</button>
+              </div>
+              <div class="navwrap"><div class="tabs">
+                <button class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Chat</span></button>
+                <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>Images</span></button>
+                <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Studio</span></button>
+                <button class="tab"><span>Notes</span></button>
+              </div></div>
+            </div>
+            <div class="screenbody" style="min-height:150px">
+              <div class="empty-hint">…content starts here</div>
+            </div>
+            <div class="measure" style="top:22px;height:104px"><span>~104px chrome</span></div>
+          </div>
+        </div></div>
+        <p class="cap">
+          Brand + subtitle + gear + badge + <b>Log out</b> on row one; tabs on row two.
+          <span class="hl">Eight more tabs</span> sit off-screen right — Checklists, Calendar, Home,
+          Files&nbsp;&amp;&nbsp;Photos, Keys, Admin, Models — with no scroll hint.
+        </p>
+      </div>
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor a">A2</span><h3>Chat lands on a list, not a chat</h3></div>
+        <div class="phone flag-bad"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="topbar"><div class="topbar-inner">
+              <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+              <span class="brand-name">Home Hub<small>on your WiFi</small></span>
+              <span class="topbar-spacer"></span><span class="user-badge">alex</span>
+            </div><div class="navwrap"><div class="tabs">
+              <button class="tab active"><span>Chat</span></button><button class="tab"><span>Images</span></button><button class="tab"><span>Studio</span></button>
+            </div></div></div>
+            <div class="screenbody">
+              <div class="chat-sidebar">
+                <div class="sidebar-head"><h2>Chats</h2><button class="btn btn-primary btn-sm">+ New</button></div>
+                <ul class="conv-list">
+                  <li class="conv-item on">Dinner ideas</li>
+                  <li class="conv-item">Homework help</li>
+                  <li class="conv-item">Holiday packing list</li>
+                  <li class="conv-item">Fix the boiler</li>
+                </ul>
+              </div>
+              <div class="empty-hint">Start a new chat or pick one from the list.</div>
+            </div>
+            <div class="measure" style="top:126px;height:150px"><span>list before chat</span></div>
+          </div>
+        </div></div>
+        <p class="cap">
+          <code>.chat-layout</code> is single-column below <b>820px</b>, so the sidebar stacks
+          <span class="hl">above</span> the conversation. On a phone you land on a file-cabinet of old chats
+          and have to scroll past it to type. This is the "odd landing" you saw.
+        </p>
+      </div>
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor a">A3</span><h3>The model picker eats a row</h3></div>
+        <div class="phone flag-bad"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="screenbody">
+              <div class="msg msg-user"><div class="msg-head">alex</div><div class="msg-body">What's for dinner?</div></div>
+              <div class="msg msg-assistant"><div class="msg-head">qwen2.5-7b</div><div class="msg-body">Orzo with roast courgettes and feta.</div></div>
+              <div class="composer">
+                <div class="composer-model">
+                  <label class="field-label">Model</label>
+                  <select class="chat-model-select"><option>qwen2.5-7b (local)</option></select>
+                </div>
+                <div class="composer-row">
+                  <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+                  <textarea rows="1" placeholder="Message the model…"></textarea>
+                  <button class="btn btn-primary">Send</button>
+                </div>
+              </div>
+            </div>
+            <div class="measure" style="top:196px;height:52px"><span>label + full select</span></div>
+          </div>
+        </div></div>
+        <p class="cap">
+          A <b>"Model"</b> label plus a <span class="hl">260px-wide select</span> on its own line, permanently
+          above the composer — for something changed once a month.
+        </p>
+      </div>
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor a">A4</span><h3>The install banner floats over content</h3></div>
+        <div class="phone flag-bad"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="gate" style="min-height:290px">
+              <div class="gate-card">
+                <div class="gate-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></div>
+                <h1>Home Hub</h1>
+                <p class="gate-sub">Your family's private AI portal — it only lives on your home WiFi.</p>
+                <input class="field" value="alex" readonly>
+                <div style="margin-top:10px"><button class="btn btn-primary btn-block">Enter the Hub</button></div>
+              </div>
+            </div>
+            <div class="pwa-install">
+              <span>📲 Install Home Hub as an app</span>
+              <button class="btn btn-primary btn-sm">Install</button>
+              <button class="btn btn-sm">Later</button>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">
+          A fixed pill <span class="hl">overlapping the card</span>, carrying an emoji and two competing
+          buttons. It also appears mid-task rather than when you've decided you want the app.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="item-head" style="margin-top:34px"><span class="anchor a">A5</span><h3>Density audit</h3><span class="sub">measured from the stylesheet</span></div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>What</th><th>Cost today</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Header row 1 (brand, gear, badge, log out)</td><td class="mono now">~54px</td><td class="mono">.topbar-inner 10px pad + 34px badge</td></tr>
+          <tr><td>Header row 2 (tab rail)</td><td class="mono now">~60px</td><td class="mono">.tabs 8px pad + 44px tap</td></tr>
+          <tr><td>Tabs available / visible at 360px</td><td class="mono now">11 / ~3</td><td class="mono">11 × icon+label ≈ 1100px</td></tr>
+          <tr><td>Chat list before the conversation</td><td class="mono now">~150px+</td><td class="mono">.chat-layout 1fr under 820px</td></tr>
+          <tr><td>Model row above composer</td><td class="mono now">~52px</td><td class="mono">.composer-model + select</td></tr>
+          <tr><td><b>Total before you can type</b></td><td class="mono now"><b>~316px</b></td><td class="mono">≈ 40% of a 780px viewport</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cap">
+      And this is with <b>Images</b> and <b>Studio</b> hidden for you. At full privilege all eleven tabs
+      show — which is the clutter you predicted.
+    </p>
+  </section>
+
+  <!-- ============================ PROPOSED ============================ -->
+  <section>
+    <div class="sec-head"><span class="sec-num good">P — Proposed</span><h2>A launcher, then one thing at a time</h2></div>
+    <p class="sec-note">
+      The core move: stop treating eleven destinations as one flat row. Land on a home screen that shows
+      the whole product, and open a single feature when it's chosen. Chat then gets the full screen it
+      needs — and adding features later grows a grid instead of squeezing a rail.
+    </p>
+
+    <div class="screens">
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor p">P1</span><h3>Launcher — the new landing</h3><span class="sub">replaces the tab rail</span></div>
+        <div class="phone flag-good"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="topbar"><div class="topbar-inner">
+              <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+              <span class="topbar-spacer"></span>
+              <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+              <span class="avatar">A</span>
+            </div></div>
+            <div class="lc-head">
+              <h1 class="lc-greet">Good evening, Alex</h1>
+              <p class="lc-status"><span class="lc-dot"></span>Everything's running · 14 devices</p>
+            </div>
+            <div class="screenbody" style="padding-top:0">
+              <div class="lc-grid">
+                <button class="lc-tile wide">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                  <span class="lc-txt"><span class="lc-name">Chat</span><span class="lc-hint">Ask anything · qwen2.5-7b</span></span>
+                  <span class="lc-badge">3</span>
+                </button>
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
+                  <span class="lc-name">Calendar</span><span class="lc-hint">2 today</span>
+                </button>
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+                  <span class="lc-name">Smart Home</span><span class="lc-hint">2 lights on</span>
+                </button>
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12l-5 5H4z"/><path d="M15 21v-5h5"/></svg></span>
+                  <span class="lc-name">Notes</span><span class="lc-hint">4 on the board</span>
+                </button>
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m4 7 2 2 3-3"/><path d="m4 17 2 2 3-3"/><path d="M13 6h7M13 18h7M13 12h7"/></svg></span>
+                  <span class="lc-name">Checklists</span><span class="lc-hint">Shopping · 6</span>
+                </button>
+              </div>
+              <p class="lc-grouplbl">Create</p>
+              <div class="lc-grid">
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+                  <span class="lc-name">Images</span><span class="lc-hint">FLUX · ready</span>
+                </button>
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></span>
+                  <span class="lc-name">Studio</span><span class="lc-hint">8 assets</span>
+                </button>
+              </div>
+              <p class="lc-grouplbl">Household</p>
+              <div class="lc-grid">
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg></span>
+                  <span class="lc-name">Files &amp; Photos</span><span class="lc-hint">312 items</span>
+                </button>
+                <button class="lc-tile">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 6l2 2M14 8l2 2"/></svg></span>
+                  <span class="lc-name">Keys</span><span class="lc-hint">2 active</span>
+                </button>
+              </div>
+              <p class="lc-grouplbl">Admin only</p>
+              <div class="lc-grid three">
+                <button class="lc-tile small"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 4.5 3.4 7.6 8 9 4.6-1.4 8-4.5 8-9V6z"/></svg></span><span class="lc-name">Devices</span></button>
+                <button class="lc-tile small"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/></svg></span><span class="lc-name">Models</span></button>
+                <button class="lc-tile small"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></span><span class="lc-name">Settings</span></button>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">
+          One header row. Every feature visible and <span class="hlg">grouped by why you'd open it</span>,
+          each with a live hint so the launcher doubles as a dashboard. New features add a tile —
+          <b>nothing gets squeezed</b>. Admin work is walled off at the bottom.
+        </p>
+      </div>
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor p">P2</span><h3>Chat — full screen, two small chips</h3></div>
+        <div class="phone flag-good"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="ch-bar">
+              <button class="ch-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+              <span class="ch-title">Chat</span>
+              <span class="topbar-spacer"></span>
+              <button class="mini-chip on"><span class="txt">qwen2.5-7b</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg></button>
+              <button class="mini-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg><span class="txt">3</span></button>
+            </div>
+            <div class="screenbody" style="min-height:250px">
+              <div class="msg msg-user"><div class="msg-head">alex</div><div class="msg-body">What's a good dinner with what's in the fridge?</div></div>
+              <div class="msg msg-assistant"><div class="msg-head">qwen2.5-7b</div><div class="msg-body">You listed courgettes, feta and orzo — a warm orzo salad works nicely. Roast the courgettes at 200°C for 20 min, then fold through cooked orzo with crumbled feta, lemon and mint.</div></div>
+              <div class="msg msg-user"><div class="msg-head">alex</div><div class="msg-body">How long does that take?</div></div>
+            </div>
+            <div class="composer">
+              <div class="composer-row">
+                <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+                <textarea rows="1" placeholder="Message…"></textarea>
+                <button class="btn btn-primary">Send</button>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">
+          Back arrow returns to the launcher. The model is a <span class="hlg">26px chip</span> showing the
+          current model — tap for a sheet. History is the <b>clock chip with a count</b>. No sidebar, no
+          "Model" label, no second header row: the conversation gets the room.
+        </p>
+      </div>
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor p">P3</span><h3>History &amp; model — sheets on demand</h3></div>
+        <div class="phone flag-good"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="ch-bar">
+              <button class="ch-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+              <span class="ch-title">Chat</span><span class="topbar-spacer"></span>
+              <button class="mini-chip on"><span class="txt">qwen2.5-7b</span></button>
+              <button class="mini-chip"><span class="txt">3</span></button>
+            </div>
+            <div class="screenbody" style="min-height:250px">
+              <div class="msg msg-assistant"><div class="msg-head">qwen2.5-7b</div><div class="msg-body">About 25 minutes start to finish.</div></div>
+            </div>
+            <div class="sheet-scrim"></div>
+            <div class="sheet-panel">
+              <div class="sheet-grip"></div>
+              <div class="sidebar-head"><h2>Your chats</h2><button class="btn btn-primary btn-sm">+ New</button></div>
+              <ul class="conv-list">
+                <li class="conv-item on">Dinner ideas <span class="tag" style="margin-left:auto">now</span></li>
+                <li class="conv-item">Homework help <span class="tag" style="margin-left:auto">Tue</span></li>
+                <li class="conv-item">Holiday packing list <span class="tag" style="margin-left:auto">Sun</span></li>
+              </ul>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">
+          One tap on the count chip. Old chats are <span class="hlg">available, not resident</span> — and the
+          same sheet pattern serves the model list, so there's one interaction to learn.
+        </p>
+      </div>
+
+      <div class="screen">
+        <div class="item-head"><span class="anchor p">P4</span><h3>Install — asked once, in place</h3></div>
+        <div class="phone flag-good"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="light">
+            <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="topbar"><div class="topbar-inner">
+              <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+              <span class="topbar-spacer"></span><span class="avatar">A</span>
+            </div></div>
+            <div class="lc-head"><h1 class="lc-greet">Good evening, Alex</h1>
+              <p class="lc-status"><span class="lc-dot"></span>Everything's running</p></div>
+            <div class="screenbody" style="padding-top:0">
+              <button class="lc-tile wide" style="border-style:dashed; box-shadow:none; background:var(--accent-soft); border-color:var(--accent)">
+                <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+                <span class="lc-txt"><span class="lc-name" style="color:var(--accent)">Add to your home screen</span>
+                  <span class="lc-hint">Opens like an app, works offline</span></span>
+              </button>
+              <div class="lc-grid" style="margin-top:var(--sp-2)">
+                <button class="lc-tile wide"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                  <span class="lc-txt"><span class="lc-name">Chat</span><span class="lc-hint">Ask anything</span></span></button>
+                <button class="lc-tile"><span class="lc-name">Calendar</span><span class="lc-hint">2 today</span></button>
+                <button class="lc-tile"><span class="lc-name">Smart Home</span><span class="lc-hint">2 lights on</span></button>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">
+          Instead of a pill floating over your card: a <span class="hlg">calm dashed tile</span> in the
+          launcher's own grid. It reads as an offer, not an interruption, and disappears once installed.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="item-head" style="margin-top:34px"><span class="anchor p">P5</span><h3>Before / after</h3></div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>&nbsp;</th><th>Today</th><th>Proposed</th></tr></thead>
+        <tbody>
+          <tr><td>Header rows</td><td class="mono now">2 (~114px)</td><td class="mono next">1 (~46px)</td></tr>
+          <tr><td>Landing screen</td><td class="mono now">Chat + list of old chats</td><td class="mono next">Launcher of all features</td></tr>
+          <tr><td>Reaching the 11th feature</td><td class="mono now">Horizontal scroll, no hint</td><td class="mono next">Visible in a group</td></tr>
+          <tr><td>Model switcher</td><td class="mono now">Label + 260px select</td><td class="mono next">26px chip → sheet</td></tr>
+          <tr><td>Chat history</td><td class="mono now">Always on screen</td><td class="mono next">One chip → sheet</td></tr>
+          <tr><td>Topbar text</td><td class="mono now">"Home Hub / on your WiFi" + "Log out"</td><td class="mono next">Mark + avatar (rest in Settings)</td></tr>
+          <tr><td>Adding feature #12</td><td class="mono now">Rail gets tighter</td><td class="mono next">One more tile</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================ CHANGES ============================ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">Build list</span><h2>What each change actually costs</h2></div>
+    <p class="sec-note">Roughly ordered cheapest-first, so you can green-light any subset.</p>
+    <div class="obs">
+      <div class="ob"><span class="anchor p">P6</span><div>
+        <h4>Strip the topbar</h4>
+        <p>Drop <code>"Home Hub / on your WiFi"</code> at phone width (keep the house mark), swap the
+          <code>user-badge</code> text for a round avatar, and move <b>Log out</b> into Settings — it's used
+          once a year and costs a permanent button today.</p>
+        <p class="fix"><b>Cost:</b> a few lines of CSS plus one markup tweak. Frees ~54px on every screen.</p>
+      </div></div>
+      <div class="ob"><span class="anchor p">P7</span><div>
+        <h4>Shrink the model picker to a chip</h4>
+        <p>Replace the <code>Model</code> label + <code>&lt;select&gt;</code> with a chip in the chat header
+          showing the current model; tap opens a sheet listing local and cloud models, keeping the
+          "leaves your home" warning where the choice is actually made.</p>
+        <p class="fix"><b>Cost:</b> small — the model list already loads; it just renders in a sheet instead of a select.</p>
+      </div></div>
+      <div class="ob"><span class="anchor p">P8</span><div>
+        <h4>Put chat history behind the count chip</h4>
+        <p>Hide <code>.chat-sidebar</code> below 820px and surface it as a bottom sheet from the header chip.
+          Desktop keeps the sidebar, where there's room for it.</p>
+        <p class="fix"><b>Cost:</b> small — same markup, shown in a sheet. This alone fixes the odd landing.</p>
+      </div></div>
+      <div class="ob"><span class="anchor p">P9</span><div>
+        <h4>Move install into the launcher grid</h4>
+        <p>Retire the fixed pill; render the offer as a dashed tile (and keep the Settings entry we already
+          added for the Android certificate route).</p>
+        <p class="fix"><b>Cost:</b> small, and it removes an element that overlaps content.</p>
+      </div></div>
+      <div class="ob"><span class="anchor p">P10</span><div>
+        <h4>Add the launcher and make it the landing</h4>
+        <p>A new <code>home</code> view: greeting, status line, grouped tiles with live counts. Tabs stay as
+          the desktop navigation; on phones the launcher replaces them, and each feature gets a back arrow.
+          Chat stops being the default destination.</p>
+        <p class="fix"><b>Cost:</b> the real piece of work — one new view, a router tweak, and per-tile count
+          queries. Everything above stands on its own if you'd rather stage it.</p>
+      </div></div>
+      <div class="ob"><span class="anchor p">P11</span><div>
+        <h4>Open question: launcher or bottom bar?</h4>
+        <p>A launcher suits a many-featured appliance and scales cleanly. A bottom tab bar (Chat · Calendar ·
+          Home · More) is faster for the four things used daily, and sits in thumb reach. They can coexist —
+          launcher as home, bottom bar inside features.</p>
+        <p class="fix"><b>Needs your call</b> before I build P10 — it changes the navigation model.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">Your turn</span><h2>Comment sheet</h2></div>
+    <p class="sec-note">Reply with a reference and a note — I'll turn them into code.</p>
+    <div class="sheet">
+      <ul>
+        <li><span class="anchor ghost">A1—A5</span> is the as-is read accurate? <span class="rule"></span></li>
+        <li><span class="anchor ghost">P1</span> launcher: groups, tiles, hints <span class="rule"></span></li>
+        <li><span class="anchor ghost">P2</span> chat header &amp; chips <span class="rule"></span></li>
+        <li><span class="anchor ghost">P3</span> sheets for history / model <span class="rule"></span></li>
+        <li><span class="anchor ghost">P4</span> install tile <span class="rule"></span></li>
+        <li><span class="anchor ghost">P6—P9</span> quick wins — build now? <span class="rule"></span></li>
+        <li><span class="anchor ghost">P10</span> launcher — build now or later? <span class="rule"></span></li>
+        <li><span class="anchor ghost">P11</span> launcher vs bottom bar <span class="rule"></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    As-is specimens are reconstructed from <code>home-hub/app/templates/index.html</code> and
+    <code>home-hub/app/static/style.css</code> at their current state; pixel figures are computed from those
+    rules, not captured from a device, so treat them as close estimates. Proposed screens are new design —
+    nothing has been changed in the app.
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var pal = 'cubby', thm = 'light';
+    var apps = document.querySelectorAll('.app');
+    function apply() {
+      apps.forEach(function (a) {
+        a.setAttribute('data-palette', pal);
+        a.setAttribute('data-theme', thm);
+      });
+    }
+    function wire(id, key, set) {
+      var host = document.getElementById(id);
+      if (!host) return;
+      host.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-' + key + ']');
+        if (!b) return;
+        set(b.dataset[key]);
+        host.querySelectorAll('button').forEach(function (x) {
+          x.setAttribute('aria-pressed', String(x === b));
+        });
+        apply();
+      });
+    }
+    wire('pal', 'pal', function (v) { pal = v; });
+    wire('thm', 'thm', function (v) { thm = v; });
+    apply();
+  })();
+</script>
+</body>
+</html>

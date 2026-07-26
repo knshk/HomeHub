@@ -1137,3 +1137,159 @@ body.modal-open { overflow: hidden; }
 .gate-admin-adv { margin: var(--sp-2) 0; }
 .gate-admin-adv summary { color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
 .gate-admin-adv[open] summary { margin-bottom: var(--sp-2); }
+
+/* =========================================================================
+   LAUNCHER (home screen) + compact chat header + bottom sheets
+   The launcher is the landing view on every screen size. On phones it also
+   REPLACES the tab rail as navigation (the rail is hidden below 820px), so
+   every feature stays reachable while the header drops to a single row.
+   ========================================================================= */
+
+/* --- topbar: leaner --- */
+.topbar-brand {
+  display: flex; align-items: center; gap: var(--sp-2);
+  background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.nav-back { flex: 0 0 auto; }
+
+/* --- launcher --- */
+.lc-head { padding: var(--sp-5) 0 var(--sp-4); }
+.lc-greet {
+  font-family: var(--font-head); font-size: var(--fs-2xl); font-weight: 700;
+  margin: 0; letter-spacing: -.01em; text-wrap: balance;
+}
+.lc-status {
+  display: flex; align-items: center; gap: 7px; margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm); color: var(--muted);
+}
+.lc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex: 0 0 auto; }
+.lc-dot.off { background: var(--danger); }
+
+.lc-grouplbl {
+  font-size: var(--fs-xs); font-weight: 800; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+.lc-grid {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
+}
+.lc-grid.three { grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr)); }
+
+.lc-tile {
+  display: flex; flex-direction: column; gap: 3px; min-height: 92px;
+  padding: var(--sp-4); border: 1px solid var(--border);
+  border-radius: var(--r-card); background: var(--surface);
+  box-shadow: var(--shadow-sm); text-align: left; font: inherit; color: var(--text);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.lc-tile:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.lc-tile:active { transform: translateY(0); }
+.lc-tile .ic { color: var(--accent); display: flex; margin-bottom: var(--sp-1); }
+.lc-tile .ic svg { width: 22px; height: 22px; }
+.lc-name { font-size: var(--fs-md); font-weight: 700; }
+.lc-hint { font-size: var(--fs-sm); color: var(--muted); }
+
+/* wide tile: icon beside text, spans the row (the primary action) */
+.lc-tile.wide {
+  grid-column: 1 / -1; flex-direction: row; align-items: center;
+  gap: var(--sp-3); min-height: 0;
+}
+.lc-tile.wide .ic { margin: 0; }
+.lc-tile.wide .lc-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* compact tile for admin utilities */
+.lc-tile.small {
+  align-items: center; text-align: center; min-height: 0;
+  padding: var(--sp-3) var(--sp-2); gap: 2px;
+}
+.lc-tile.small .ic { margin: 0 auto 2px; }
+.lc-tile.small .lc-name { font-size: var(--fs-sm); }
+
+/* install offer, presented as an invitation rather than an interruption */
+.lc-install {
+  margin-bottom: var(--sp-3); border-style: dashed;
+  border-color: var(--accent); background: var(--accent-soft); box-shadow: none;
+}
+.lc-install .lc-name { color: var(--accent); }
+.lc-install .ic { color: var(--accent); }
+
+/* --- compact chat header (model + history as chips) --- */
+.ch-bar {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.ch-title { font-family: var(--font-head); font-size: var(--fs-lg); font-weight: 700; }
+.mini-chip {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 10px;
+  border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 700; font-family: inherit;
+  max-width: 46vw; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.mini-chip.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.mini-chip svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.mini-chip .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- sheet scrim (shared by the history + model sheets) --- */
+.sheet-scrim { position: fixed; inset: 0; z-index: 290; background: rgba(10,12,18,.45); }
+
+/* =========================================================================
+   Phone layout: one header row, launcher as navigation, sheets for the rest.
+   ========================================================================= */
+@media (max-width: 819px) {
+  /* The launcher replaces the tab rail; the rail returns on wider screens. */
+  .navwrap { display: none; }
+
+  /* Brand text and the permanent Log out button both cost a crowded row.
+     Log out moved into Settings; the wordmark is implied by the icon. */
+  .topbar-brand .brand-name { display: none; }
+  #logout-btn { display: none; }
+
+  /* Badge collapses to a single-letter avatar (text kept for screen readers). */
+  #me-badge {
+    width: 32px; height: 32px; padding: 0; justify-content: center;
+    border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    font-size: 0; overflow: hidden; font-weight: 800;
+  }
+  #me-badge::before { content: attr(data-initial); font-size: var(--fs-sm); }
+
+  /* Chat history: a sheet on demand instead of a permanent list above the chat.
+     Same DOM node — only its presentation changes. */
+  .chat-sidebar { display: none; }
+  body.sheet-history .chat-sidebar {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 300;
+    margin: 0; max-height: 72dvh; overflow: auto;
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    box-shadow: var(--shadow-lg);
+    padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+  }
+  body.sheet-history .conv-list { max-height: none; }
+
+  /* Model picker: same sheet treatment. :not([hidden]) preserves the
+     admin-only gating — a non-admin's bar must stay hidden either way. */
+  .composer-model { display: none; }
+  body.sheet-model .composer-model:not([hidden]) {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 300;
+    flex-direction: column; align-items: stretch; gap: var(--sp-2);
+    background: var(--surface); border-top: 1px solid var(--border);
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    box-shadow: var(--shadow-lg);
+    padding: var(--sp-4) var(--sp-4) max(var(--sp-4), env(safe-area-inset-bottom));
+  }
+  body.sheet-model .chat-model-select { max-width: none; width: 100%; min-height: 44px; }
+
+  /* Give the conversation the room freed up by the above. */
+  .chat-messages { max-height: none; }
+}
+
+/* Wider screens keep the tab rail AND the sidebar — nothing is taken away.
+   The chat chips are phone-only there, since the sidebar already shows history. */
+@media (min-width: 820px) {
+  /* Desktop keeps the sidebar and the inline model picker, so the phone chips
+     would only duplicate them. The "Chat" title in the bar stays. */
+  #chat-history-chip, #chat-model-chip { display: none; }
+  .sheet-scrim { display: none; }
+}
