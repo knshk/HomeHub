@@ -1494,3 +1494,49 @@ body.modal-open { overflow: hidden; }
   .cal-wk-head { flex: 0 0 100%; }
   .cal-year { grid-template-columns: 1fr 1fr; }
 }
+
+/* =========================================================================
+   Speak-replies toggle — moved into the composer row beside Send.
+   Scoped to .speak-toggle so the shared .switch component (Keys page) is
+   untouched. Wide screens keep the slider with the speaker riding the knob;
+   phones collapse it to a small crossed/uncrossed speaker button, which frees
+   the width that was squeezing the input.
+   ========================================================================= */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.chat-voice-bar { display: flex; align-items: center; flex: 0 0 auto; }
+.speak-toggle { gap: 0; }
+.speak-toggle .track { width: 46px; height: 28px; }
+.speak-toggle .track::after { width: 22px; height: 22px; top: 3px; left: 3px; }
+.speak-toggle input:checked + .track::after { transform: translateX(18px); }
+
+/* the speaker rides on the knob and moves with it */
+.speak-toggle .knob-ic {
+  position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; z-index: 1;
+  display: grid; place-items: center; color: var(--muted);
+  transition: transform .18s ease, color .18s ease;
+}
+.speak-toggle .knob-ic svg { width: 13px; height: 13px; }
+.speak-toggle input:checked + .track .knob-ic { transform: translateX(18px); color: var(--accent); }
+.speak-toggle .ic-on { display: none; }
+.speak-toggle input:checked + .track .ic-on { display: block; }
+.speak-toggle input:checked + .track .ic-off { display: none; }
+
+.voice-status { display: block; margin-top: var(--sp-2); padding: 0 4px; }
+
+/* Phone: a plain speaker button (crossed = off), same tap target as the mic. */
+@media (max-width: 640px) {
+  .speak-toggle .track {
+    width: 38px; height: 38px; border-radius: var(--r-md);
+    background: var(--surface-2); border: 1.5px solid transparent;
+  }
+  .speak-toggle .track::after { display: none; }
+  .speak-toggle .knob-ic { position: static; width: 100%; height: 100%; transform: none; }
+  .speak-toggle .knob-ic svg { width: 17px; height: 17px; }
+  .speak-toggle input:checked + .track { background: var(--accent-soft); }
+  .speak-toggle input:checked + .track .knob-ic { transform: none; color: var(--accent); }
+  .speak-toggle input:focus-visible + .track { box-shadow: var(--ring); }
+}

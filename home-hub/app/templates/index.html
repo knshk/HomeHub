@@ -291,17 +291,24 @@
                 </button>
                 <textarea id="chat-input" rows="1" placeholder="Ask anything&hellip;"
                           autocomplete="off"></textarea>
+                <!-- Speak replies: icon-only toggle sitting beside Send, so the
+                     composer stays one row and the input keeps its full height. -->
+                <div class="chat-voice-bar" id="chat-voice-bar" hidden>
+                  <label class="speak-toggle switch" title="Speak replies aloud">
+                    <input type="checkbox" id="speak-replies-toggle">
+                    <span class="track">
+                      <span class="knob-ic" aria-hidden="true">
+                        <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+                        <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
+                      </span>
+                    </span>
+                    <span class="sr-only">Speak replies aloud</span>
+                  </label>
+                </div>
                 <button type="submit" id="chat-send" class="btn btn-primary send-btn">Send</button>
                 <button type="button" id="chat-stop" class="btn btn-ghost" hidden>Stop</button>
               </div>
-              <div class="chat-voice-bar composer-bar" id="chat-voice-bar" hidden>
-                <label class="speak-toggle switch" title="Read assistant replies aloud after voice messages">
-                  <input type="checkbox" id="speak-replies-toggle">
-                  <span class="track"></span>
-                  <span>&#128266; Speak replies</span>
-                </label>
-                <span class="voice-status" id="voice-status" aria-live="polite" hidden></span>
-              </div>
+              <span class="voice-status" id="voice-status" aria-live="polite" hidden></span>
             </form>
           </div>
         </div>
