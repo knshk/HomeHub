@@ -978,6 +978,11 @@ function updateNavBack() {
 function openSheet(kind) {
   document.body.classList.remove('sheet-history', 'sheet-model');
   document.body.classList.add(kind === 'model' ? 'sheet-model' : 'sheet-history');
+  // Anchor the panel directly under the header, so it reads as having opened
+  // from the chip you tapped rather than appearing at the far end of the page.
+  const bar = document.querySelector('.topbar');
+  const top = bar ? Math.round(bar.getBoundingClientRect().bottom) : 58;
+  document.documentElement.style.setProperty('--sheet-top', top + 'px');
   const scrim = $('#sheet-scrim');
   if (scrim) scrim.hidden = false;
 }
@@ -986,6 +991,22 @@ function closeSheets() {
   document.body.classList.remove('sheet-history', 'sheet-model');
   const scrim = $('#sheet-scrim');
   if (scrim) scrim.hidden = true;
+}
+
+/** Composer: one line at rest, grows with the message up to 4 lines, then
+ *  scrolls internally. Called on input and again after a send clears it. */
+const COMPOSER_MAX_LINES = 4;
+function autoGrowComposer() {
+  const ta = $('#chat-input');
+  if (!ta) return;
+  const cs = getComputedStyle(ta);
+  const line = parseFloat(cs.lineHeight) || 20;
+  const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  const max = Math.round(line * COMPOSER_MAX_LINES + pad);
+  ta.style.height = 'auto';                       // measure the natural height
+  const next = Math.min(ta.scrollHeight, max);
+  ta.style.height = next + 'px';
+  ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
 }
 
 /** Keep the header chips in step with the model select and the chat list. */
@@ -1341,8 +1362,8 @@ function wireChat() {
   });
 
   const input = $('#chat-input');
-  const autosize = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 180) + 'px'; };
-  input.addEventListener('input', autosize);
+  input.addEventListener('input', autoGrowComposer);
+  autoGrowComposer();                       // start at a single line
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#chat-form').requestSubmit(); }
   });
@@ -1522,7 +1543,7 @@ async function sendMessage() {
   let replyOk = false;
 
   input.value = '';
-  input.style.height = 'auto';
+  autoGrowComposer();          // collapse back to a single line after sending
   appendMessage('user', content);
   scrollChat();
 

@@ -1293,3 +1293,83 @@ body.modal-open { overflow: hidden; }
   #chat-history-chip, #chat-model-chip { display: none; }
   .sheet-scrim { display: none; }
 }
+
+/* =========================================================================
+   Review round 2 — fixes from testing on a real phone + wide desktop.
+   ========================================================================= */
+
+/* Composer: floats clear of the bottom edge, one line at rest, grows to 4
+   lines (height is driven by autoGrowComposer, which also handles shrinking). */
+.composer-row textarea { max-height: none; overflow-y: hidden; }
+
+/* --- PHONE ------------------------------------------------------------- */
+@media (max-width: 819px) {
+  /* Two tiles per row (the previous 190px minimum silently collapsed to one
+     column at 360px, which is why the grid looked like a stack of banners). */
+  .lc-grid { grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+  .lc-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+
+  /* Denser tiles so two fit comfortably and less scrolling is needed. */
+  .lc-tile { min-height: 0; padding: var(--sp-3); gap: 1px; }
+  .lc-tile .ic svg { width: 19px; height: 19px; }
+  .lc-name { font-size: var(--fs-sm); }
+  .lc-hint { font-size: var(--fs-xs); line-height: 1.3; }
+  .lc-head { padding: var(--sp-4) 0 var(--sp-3); }
+  .lc-greet { font-size: var(--fs-xl); }
+  .lc-grouplbl { margin: var(--sp-4) 0 var(--sp-2); }
+
+  /* Sheets open DIRECTLY UNDER THE HEADER, next to the chip that opened them
+     — previously they sat at the bottom of a long page, so you had to scroll
+     to find your own chat history. --sheet-top is measured in openSheet(). */
+  body.sheet-history .chat-sidebar,
+  body.sheet-model .composer-model:not([hidden]) {
+    position: fixed; z-index: 300;
+    top: var(--sheet-top, 58px);
+    left: var(--sp-3); right: var(--sp-3);
+    max-width: 420px; margin-left: auto;
+    max-height: min(62dvh, 460px); overflow: auto;
+    border: 1px solid var(--border); border-radius: var(--r-card);
+    box-shadow: var(--shadow-lg);
+    animation: sheetIn .16s ease both;
+  }
+  body.sheet-history .chat-sidebar { display: block; padding: var(--sp-3); }
+  body.sheet-model .composer-model:not([hidden]) {
+    display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-2);
+    background: var(--surface); padding: var(--sp-4);
+  }
+  body.sheet-model .chat-model-select { max-width: none; width: 100%; min-height: 44px; }
+  body.sheet-history .conv-list { max-height: none; }
+
+  /* Composer floats above the bottom edge (and above the home indicator). */
+  .composer {
+    position: sticky;
+    bottom: max(var(--sp-2), env(safe-area-inset-bottom));
+    margin-bottom: var(--sp-2);
+  }
+}
+
+@keyframes sheetIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { @keyframes sheetIn { from { opacity: 1; } to { opacity: 1; } } }
+
+/* --- WIDE DESKTOP ------------------------------------------------------ */
+/* The launcher was designed phone-first, which left a wide screen feeling
+   sparse and top-heavy. Above 1080px the groups flow into columns so the
+   whole board is visible without scrolling, and tiles stop stretching. */
+@media (min-width: 1080px) {
+  #lc-groups {
+    column-count: 2; column-gap: var(--sp-5);
+  }
+  #lc-groups > .lc-grid, #lc-groups > .lc-grouplbl { break-inside: avoid; }
+  #lc-groups > .lc-grouplbl:first-child { margin-top: 0; }
+  .lc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 165px), 1fr)); }
+
+  /* The primary tile becomes a proper hero rather than a long thin bar. */
+  .lc-tile.wide {
+    padding: var(--sp-5); min-height: 104px; border-color: var(--border-strong);
+  }
+  .lc-tile.wide .ic svg { width: 26px; height: 26px; }
+  .lc-tile.wide .lc-name { font-size: var(--fs-lg); }
+
+  /* Greeting and the hero sit side by side, so the fold carries real content. */
+  .lc-head { padding: var(--sp-6) 0 var(--sp-4); }
+}
