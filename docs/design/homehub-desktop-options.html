@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeHub — Desktop Layout Options</title>
+</head>
+<body>
+<style>
+  :root {
+    --rv-ink:#14161B; --rv-panel:#1C1F26; --rv-panel2:#23272F; --rv-line:#2B303A;
+    --rv-paper:#E9ECF2; --rv-dim:#868D9C; --rv-mark:#35C4B5; --rv-good:#7BE0A8; --rv-bad:#F0796B;
+    --rv-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --rv-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--rv-ink); color:var(--rv-paper);
+    font-family:var(--rv-sans); font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1240px; margin:0 auto; padding:0 20px 96px; }
+
+  .mast { padding:52px 0 24px; border-bottom:1px solid var(--rv-line); }
+  .kicker { font-family:var(--rv-mono); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--rv-mark); margin:0 0 14px; }
+  h1 { font-size:clamp(1.9rem,1.4rem + 2vw,2.5rem); line-height:1.1; margin:0 0 14px;
+    letter-spacing:-.02em; text-wrap:balance; font-weight:650; }
+  .lede { color:var(--rv-dim); max-width:64ch; margin:0; }
+  .lede strong { color:var(--rv-paper); font-weight:600; }
+  .fixed-note { margin:22px 0 0; padding:14px 16px; border:1px solid var(--rv-line);
+    border-left:2px solid var(--rv-good); border-radius:0 8px 8px 0; background:var(--rv-panel);
+    font-size:14px; color:var(--rv-dim); }
+  .fixed-note b { color:var(--rv-good); }
+  .fixed-note ul { margin:8px 0 0; padding-left:18px; }
+
+  .rail { position:sticky; top:0; z-index:20; margin:0 -20px; padding:12px 20px;
+    background:rgba(20,22,27,.87); backdrop-filter:blur(10px) saturate(140%);
+    border-bottom:1px solid var(--rv-line); display:flex; flex-wrap:wrap; gap:18px; align-items:center; }
+  .rail-lbl { font-family:var(--rv-mono); font-size:10.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--rv-dim); }
+  .seg { display:inline-flex; border:1px solid var(--rv-line); border-radius:8px; overflow:hidden; }
+  .seg button { appearance:none; border:0; background:transparent; color:var(--rv-dim);
+    font:inherit; font-size:13px; font-weight:550; padding:7px 13px; cursor:pointer; }
+  .seg button + button { border-left:1px solid var(--rv-line); }
+  .seg button[aria-pressed="true"] { background:var(--rv-mark); color:var(--rv-ink); font-weight:650; }
+  :where(button,a,[tabindex]):focus-visible { outline:2px solid var(--rv-mark); outline-offset:2px; }
+
+  section { padding:44px 0 8px; }
+  .opt-head { display:flex; align-items:baseline; gap:12px; margin:0 0 6px; flex-wrap:wrap; }
+  .opt-head h2 { font-size:1.3rem; margin:0; font-weight:650; letter-spacing:-.01em; }
+  .anchor { display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:21px;
+    padding:0 7px; font-family:var(--rv-mono); font-size:11px; font-weight:700;
+    color:var(--rv-ink); background:var(--rv-mark); border-radius:4px; user-select:all; flex:0 0 auto; }
+  .anchor.shipped { background:var(--rv-good); }
+  .tagline { font-family:var(--rv-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    padding:2px 7px; border-radius:4px; }
+  .t-shipped { color:var(--rv-good); background:rgba(123,224,168,.13); }
+  .t-work { color:#F0C674; background:rgba(240,198,116,.13); }
+  .sec-note { color:var(--rv-dim); font-size:14px; max-width:76ch; margin:0 0 20px; }
+  .verdict { display:grid; gap:6px; margin:16px 0 0; font-size:13.5px; }
+  .verdict div { display:grid; grid-template-columns:78px 1fr; gap:12px; }
+  .verdict dt { font-family:var(--rv-mono); font-size:10.5px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--rv-dim); padding-top:3px; }
+  .verdict .good { color:var(--rv-good); }
+  .verdict .cost { color:#F0C674; }
+
+  /* desktop frame */
+  .frame { border:1px solid var(--rv-line); border-radius:12px; overflow:hidden;
+    box-shadow:0 20px 44px rgba(0,0,0,.4); background:#000; }
+  .frame.pick { border-color:rgba(53,196,181,.45); }
+  .chrome { display:flex; align-items:center; gap:7px; padding:8px 12px;
+    background:var(--rv-panel2); border-bottom:1px solid var(--rv-line); }
+  .chrome i { width:9px; height:9px; border-radius:50%; background:#3A404C; display:block; }
+  .chrome span { font-family:var(--rv-mono); font-size:10.5px; color:var(--rv-dim); margin-left:8px; }
+  .scaler { overflow-x:auto; }
+  .cap { color:var(--rv-dim); font-size:13px; margin:10px 0 0; }
+  .cap b { color:var(--rv-paper); }
+
+  .phones { display:grid; gap:24px; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); }
+  .phone { border:1px solid var(--rv-line); border-radius:26px; padding:8px;
+    background:linear-gradient(180deg,#2A2F39,#1A1D24); box-shadow:0 20px 40px rgba(0,0,0,.42); }
+  .phone-inner { border-radius:19px; overflow:hidden; background:#000; position:relative; }
+  .statusbar { display:flex; align-items:center; justify-content:space-between; padding:5px 14px 4px;
+    font-family:var(--rv-mono); font-size:10px; color:var(--muted); background:var(--bg); }
+  .statusbar .dots { display:flex; gap:3px; }
+  .statusbar .dots i { width:4px; height:4px; border-radius:50%; background:var(--muted); display:block; }
+
+  .sheet { border:1px dashed var(--rv-line); border-radius:12px; padding:20px; background:var(--rv-panel); }
+  .sheet ul { margin:12px 0 0; padding:0; list-style:none; display:grid; gap:9px; }
+  .sheet li { display:flex; gap:11px; align-items:center; color:var(--rv-dim); font-size:13.5px; }
+  .rule { height:1px; flex:1; background:var(--rv-line); }
+  footer { margin-top:52px; padding-top:20px; border-top:1px solid var(--rv-line);
+    color:var(--rv-dim); font-size:13px; }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
+
+  /* ===================== APP TOKENS (verbatim from style.css) ===================== */
+  .app {
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+    --fs-xs:0.78rem; --fs-sm:0.875rem; --fs-md:1rem; --fs-lg:1.125rem; --fs-xl:1.375rem;
+    --r-sm:10px; --r-md:14px; --r-lg:18px; --r-card:20px; --r-pill:999px;
+    --shadow-sm:0 1px 2px rgba(20,24,40,.06),0 1px 3px rgba(20,24,40,.05);
+    --shadow-md:0 4px 14px rgba(20,24,40,.08),0 2px 6px rgba(20,24,40,.05);
+    --shadow-lg:0 18px 50px rgba(20,24,40,.22);
+    --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-head:ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif;
+    --note-yellow:#FDE8B5; --note-green:#CFE9D6; --note-blue:#CFE0FB; --note-pink:#F6D2D6;
+    font-family:var(--font-body); color:var(--text); background:var(--bg); font-size:15px; line-height:1.5;
+  }
+  .app[data-palette="greenhouse"] { --font-head:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --r-sm:8px; --r-md:12px; --r-lg:14px; --r-card:16px; }
+  .app[data-palette="hearth"] { --font-head:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --r-sm:7px; --r-md:10px; --r-lg:13px; --r-card:14px; }
+  .app[data-palette="cubby"][data-theme="light"] { --bg:#EEF0F4; --surface:#FFFFFF; --surface-2:#F5F7FB;
+    --surface-3:#EDEFF6; --text:#1E2333; --muted:#5B6378; --faint:#8A93A8; --border:#DCE0EB;
+    --border-strong:#C7CDDC; --accent:#3B5BD9; --accent-ink:#FFF; --accent-soft:#E3E9FC;
+    --pop:#F2B632; --pop-soft:#FCEFCB; --danger:#D6453B; --danger-soft:#FBE2E0; --success:#2E9E6B; --success-soft:#DBF1E6; }
+  .app[data-palette="cubby"][data-theme="dark"] { --bg:#141824; --surface:#1E2431; --surface-2:#262E3E;
+    --surface-3:#2E3850; --text:#EAEDF6; --muted:#9BA4BA; --faint:#717C95; --border:#303A4E;
+    --border-strong:#3C4862; --accent:#7B92F2; --accent-ink:#0E1320; --accent-soft:#283460;
+    --pop:#F2B632; --pop-soft:#3D341B; --danger:#F0786E; --danger-soft:#3A2220; --success:#4FC089; --success-soft:#163127; }
+  .app[data-palette="greenhouse"][data-theme="light"] { --bg:#EAEFE7; --surface:#FFFFFF; --surface-2:#F4F7F1;
+    --surface-3:#E9EFE5; --text:#1E332A; --muted:#56695C; --faint:#84957F; --border:#D5DECF;
+    --border-strong:#C2CEB9; --accent:#356B57; --accent-ink:#FFF; --accent-soft:#DCE8DF;
+    --pop:#E0A56B; --pop-soft:#F6E7D4; --danger:#C0533F; --danger-soft:#F4E0D9; --success:#3E8E5E; --success-soft:#DCEEE1; }
+  .app[data-palette="greenhouse"][data-theme="dark"] { --bg:#14201A; --surface:#1C2A23; --surface-2:#233129;
+    --surface-3:#2B3B31; --text:#E7EFE7; --muted:#93A799; --faint:#6E8273; --border:#2C3D33;
+    --border-strong:#3A4F42; --accent:#62A786; --accent-ink:#0C1611; --accent-soft:#21382D;
+    --pop:#E0A56B; --pop-soft:#382C1F; --danger:#E08571; --danger-soft:#36231D; --success:#5BB07E; --success-soft:#15291E; }
+  .app[data-palette="hearth"][data-theme="light"] { --bg:#F4EDE1; --surface:#FFFBF4; --surface-2:#F7F0E4;
+    --surface-3:#F0E6D6; --text:#2B2118; --muted:#6E6052; --faint:#9A8B79; --border:#E4D8C6;
+    --border-strong:#D6C7B0; --accent:#C2673B; --accent-ink:#FFF; --accent-soft:#F1DFD1;
+    --pop:#5C7A6B; --pop-soft:#DDE7E0; --danger:#B24A3A; --danger-soft:#F2DCD6; --success:#4E7A52; --success-soft:#DEE9DD; }
+  .app[data-palette="hearth"][data-theme="dark"] { --bg:#211C16; --surface:#2B251D; --surface-2:#342D24;
+    --surface-3:#3E3528; --text:#F1E9DC; --muted:#B3A593; --faint:#897C6A; --border:#3D352A;
+    --border-strong:#4C4234; --accent:#DB8458; --accent-ink:#1A140E; --accent-soft:#3A2D22;
+    --pop:#88A38F; --pop-soft:#2A352E; --danger:#E08571; --danger-soft:#382420; --success:#7FAA82; --success-soft:#25301F; }
+
+  /* shared app bits */
+  .app .topbar { background:var(--bg); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:var(--sp-2); padding:9px var(--sp-4); }
+  .app .brand-mark { color:var(--accent); display:flex; }
+  .app .brand-mark svg { width:21px; height:21px; }
+  .app .brand-name { font-family:var(--font-head); font-weight:700; font-size:var(--fs-md); }
+  .app .spacer { flex:1; }
+  .app .icon-btn { display:inline-grid; place-items:center; width:32px; height:32px; flex:0 0 auto;
+    border-radius:var(--r-md); background:var(--surface-2); color:var(--text); border:0; }
+  .app .icon-btn svg { width:16px; height:16px; }
+  .app .avatar { display:inline-grid; place-items:center; width:31px; height:31px; flex:0 0 auto;
+    border-radius:50%; background:var(--accent); color:var(--accent-ink); font-size:var(--fs-xs); font-weight:800; }
+  .app .btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2);
+    min-height:34px; padding:0 13px; border:1.5px solid transparent; border-radius:var(--r-md);
+    background:var(--surface-2); color:var(--text); font-weight:600; font-size:var(--fs-sm);
+    font-family:inherit; white-space:nowrap; }
+  .app .btn-primary { background:var(--accent); color:var(--accent-ink); box-shadow:var(--shadow-sm); }
+  .app .btn-sm { min-height:28px; padding:0 10px; font-size:var(--fs-xs); }
+  .app .tag { display:inline-flex; align-items:center; height:19px; padding:0 7px; border-radius:var(--r-pill);
+    font-size:var(--fs-xs); font-weight:700; background:var(--surface-3); color:var(--muted); }
+  .app .muted { color:var(--muted); font-size:var(--fs-sm); }
+
+  /* launcher pieces */
+  .app .lc-greet { font-family:var(--font-head); font-weight:700; margin:0; letter-spacing:-.01em; }
+  .app .lc-status { display:flex; align-items:center; gap:6px; margin:6px 0 0;
+    font-size:var(--fs-sm); color:var(--muted); }
+  .app .lc-dot { width:7px; height:7px; border-radius:50%; background:var(--success); }
+  .app .lc-grouplbl { font-size:var(--fs-xs); font-weight:800; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--faint); margin:var(--sp-4) 0 var(--sp-2); }
+  .app .lc-grid { display:grid; gap:var(--sp-3); }
+  .app .lc-tile { display:flex; flex-direction:column; gap:2px; padding:var(--sp-3) var(--sp-4);
+    border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface);
+    box-shadow:var(--shadow-sm); text-align:left; font:inherit; color:var(--text); }
+  .app .lc-tile .ic { color:var(--accent); display:flex; margin-bottom:2px; }
+  .app .lc-tile .ic svg { width:20px; height:20px; }
+  .app .lc-name { font-weight:700; font-size:var(--fs-md); }
+  .app .lc-hint { font-size:var(--fs-sm); color:var(--muted); }
+  .app .lc-tile.hero { flex-direction:row; align-items:center; gap:var(--sp-4); padding:var(--sp-5); }
+  .app .lc-tile.hero .ic svg { width:26px; height:26px; }
+  .app .lc-tile.hero .lc-name { font-size:var(--fs-lg); }
+  .app .lc-txt { display:flex; flex-direction:column; gap:2px; }
+
+  /* D2: side rail */
+  .app .shell { display:grid; grid-template-columns:210px 1fr; min-height:430px; }
+  .app .siderail { background:var(--surface); border-right:1px solid var(--border);
+    padding:var(--sp-3); display:flex; flex-direction:column; gap:2px; }
+  .app .sr-lbl { font-size:var(--fs-xs); font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--faint); margin:var(--sp-3) 0 var(--sp-1); padding:0 var(--sp-2); }
+  .app .sr-item { display:flex; align-items:center; gap:var(--sp-2); padding:7px var(--sp-2);
+    border-radius:var(--r-md); color:var(--muted); font-size:var(--fs-sm); font-weight:600; }
+  .app .sr-item .ic { display:flex; color:currentColor; }
+  .app .sr-item .ic svg { width:16px; height:16px; }
+  .app .sr-item.on { background:var(--accent-soft); color:var(--accent); }
+  .app .sr-item .tag { margin-left:auto; }
+  .app .main { padding:var(--sp-5); background:var(--bg); min-width:0; }
+
+  /* D3: content dashboard */
+  .app .dash { display:grid; gap:var(--sp-3); grid-template-columns:repeat(3,1fr); }
+  .app .dcard { border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface);
+    box-shadow:var(--shadow-sm); padding:var(--sp-4); min-width:0; }
+  .app .dcard.span2 { grid-column:span 2; }
+  .app .dhead { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2);
+    margin-bottom:var(--sp-3); }
+  .app .dtitle { font-family:var(--font-head); font-weight:700; font-size:var(--fs-md); }
+  .app .drow { display:flex; align-items:center; gap:var(--sp-2); padding:6px 0;
+    border-top:1px solid var(--border); font-size:var(--fs-sm); }
+  .app .drow:first-of-type { border-top:0; }
+  .app .dtime { font-family:var(--rv-mono); font-size:var(--fs-xs); color:var(--accent);
+    font-weight:700; flex:0 0 46px; }
+  .app .dnote { padding:var(--sp-2) var(--sp-3); border-radius:var(--r-md); font-size:var(--fs-xs);
+    color:#2b2418; margin-bottom:6px; }
+  .app .dev-row { display:flex; align-items:center; gap:var(--sp-2); padding:5px 0; font-size:var(--fs-sm); }
+  .app .sw { margin-left:auto; width:32px; height:18px; border-radius:var(--r-pill);
+    background:var(--surface-3); position:relative; flex:0 0 auto; }
+  .app .sw.on { background:var(--accent); }
+  .app .sw::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px;
+    border-radius:50%; background:#fff; }
+  .app .sw.on::after { left:auto; right:2px; }
+
+  /* D4: ask-first */
+  .app .askbox { background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:var(--r-card); box-shadow:var(--shadow-md); padding:var(--sp-3) var(--sp-4);
+    display:flex; align-items:center; gap:var(--sp-3); }
+  .app .askbox .ph { flex:1; color:var(--faint); font-size:var(--fs-md); }
+  .app .quick { display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-top:var(--sp-3); }
+  .app .qchip { display:inline-flex; align-items:center; gap:5px; min-height:30px; padding:0 12px;
+    border-radius:var(--r-pill); background:var(--surface-2); border:1px solid var(--border);
+    color:var(--muted); font-size:var(--fs-xs); font-weight:700; }
+
+  /* phone bottom bar */
+  .app .tabbar { display:flex; border-top:1px solid var(--border); background:var(--surface);
+    padding:4px 0 max(4px, env(safe-area-inset-bottom)); }
+  .app .tb { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:6px 0; color:var(--muted); font-size:9.5px; font-weight:700; }
+  .app .tb.on { color:var(--accent); }
+  .app .tb .ic { display:flex; }
+  .app .tb .ic svg { width:19px; height:19px; }
+  .app .screenbody { padding:var(--sp-3); background:var(--bg); }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">Round 3 · desktop directions</p>
+    <h1>Four ways the desktop view could work</h1>
+    <p class="lede">
+      The launcher was built phone-first, so on a 1850px screen it read as a narrow column of small
+      tiles in a lot of empty room — <strong>disconnected and poorly placed</strong>, as you put it.
+      Below are four directions, from a light touch to a genuine desktop composition, plus the
+      <strong>bottom bar</strong> you couldn't judge unseen. Palette and theme switch all of them.
+    </p>
+    <p class="fixed-note">
+      <b>Already fixed and live</b> from your last round — just refresh:
+      <ul>
+        <li><b>Two-up tiles on the phone.</b> The 190px minimum silently collapsed to one column at 360px; phone widths now use an explicit 2-col.</li>
+        <li><b>Chat history opens under the header</b>, beside the chip you tapped — no more scrolling to the end of a long chat to find it.</li>
+        <li><b>Composer</b> starts at one line, grows to four, scrolls after that, and snaps back to one line on send. It also floats clear of the home indicator.</li>
+      </ul>
+    </p>
+  </header>
+
+  <div class="rail">
+    <span class="rail-lbl">Palette</span>
+    <div class="seg" id="pal">
+      <button type="button" data-pal="cubby" aria-pressed="true">Cubby</button>
+      <button type="button" data-pal="greenhouse" aria-pressed="false">Greenhouse</button>
+      <button type="button" data-pal="hearth" aria-pressed="false">Hearth</button>
+    </div>
+    <span class="rail-lbl">Theme</span>
+    <div class="seg" id="thm">
+      <button type="button" data-thm="light" aria-pressed="true">Light</button>
+      <button type="button" data-thm="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+
+  <!-- ===================== D1 ===================== -->
+  <section>
+    <div class="opt-head"><span class="anchor shipped">D1</span><h2>Two-column board</h2>
+      <span class="tagline t-shipped">shipped just now</span></div>
+    <p class="sec-note">
+      The minimum fix: groups flow into two columns so the whole board fits above the fold, tiles stop
+      stretching, and Chat becomes a real hero card instead of a long thin bar. This is what's live —
+      look at it and tell me whether it's enough.
+    </p>
+    <div class="frame"><div class="chrome"><i></i><i></i><i></i><span>homehub.local</span></div>
+      <div class="app" data-palette="cubby" data-theme="light">
+        <div class="topbar">
+          <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+          <span class="brand-name">Home Hub</span><span class="spacer"></span>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></button>
+          <span class="avatar">K</span>
+        </div>
+        <div style="padding:var(--sp-5) var(--sp-6) var(--sp-6)">
+          <h1 class="lc-greet" style="font-size:1.7rem">Good evening, kanishka</h1>
+          <p class="lc-status"><span class="lc-dot"></span>AI ready · Voice ready</p>
+          <div style="columns:2; column-gap:var(--sp-5); margin-top:var(--sp-5)">
+            <div style="break-inside:avoid">
+              <button class="lc-tile hero" style="width:100%">
+                <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="lc-txt"><span class="lc-name">Chat</span><span class="lc-hint">Ask anything · 1 chat</span></span>
+              </button>
+              <div class="lc-grid" style="grid-template-columns:1fr 1fr; margin-top:var(--sp-3)">
+                <button class="lc-tile"><span class="lc-name">Calendar</span><span class="lc-hint">Events &amp; chores</span></button>
+                <button class="lc-tile"><span class="lc-name">Smart Home</span><span class="lc-hint">Lights, locks</span></button>
+                <button class="lc-tile"><span class="lc-name">Notes</span><span class="lc-hint">Noticeboard</span></button>
+                <button class="lc-tile"><span class="lc-name">Checklists</span><span class="lc-hint">Lists</span></button>
+              </div>
+            </div>
+            <div style="break-inside:avoid">
+              <p class="lc-grouplbl" style="margin-top:0">Create</p>
+              <div class="lc-grid" style="grid-template-columns:1fr 1fr">
+                <button class="lc-tile"><span class="lc-name">Images</span><span class="lc-hint">Create pictures</span></button>
+                <button class="lc-tile"><span class="lc-name">Studio</span><span class="lc-hint">Art &amp; animation</span></button>
+              </div>
+              <p class="lc-grouplbl">Household</p>
+              <div class="lc-grid" style="grid-template-columns:1fr 1fr">
+                <button class="lc-tile"><span class="lc-name">Files</span><span class="lc-hint">Browse, search</span></button>
+                <button class="lc-tile"><span class="lc-name">Keys</span><span class="lc-hint">For other apps</span></button>
+              </div>
+              <p class="lc-grouplbl">Admin only</p>
+              <div class="lc-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <button class="lc-tile" style="align-items:center;text-align:center"><span class="lc-name" style="font-size:var(--fs-sm)">Admin</span></button>
+                <button class="lc-tile" style="align-items:center;text-align:center"><span class="lc-name" style="font-size:var(--fs-sm)">Models</span></button>
+                <button class="lc-tile" style="align-items:center;text-align:center"><span class="lc-name" style="font-size:var(--fs-sm)">Settings</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="verdict">
+      <div><dt>Good</dt><dd class="good">No structural change. Fills the width, one screen, no scrolling.</dd></div>
+      <div><dt>Cost</dt><dd class="cost">Done — it's live.</dd></div>
+      <div><dt>Limit</dt><dd>Still a menu of links. The screen tells you nothing you didn't already know.</dd></div>
+    </div>
+  </section>
+
+  <!-- ===================== D2 ===================== -->
+  <section>
+    <div class="opt-head"><span class="anchor">D2</span><h2>Left rail — a proper app shell</h2>
+      <span class="tagline t-work">small–medium</span></div>
+    <p class="sec-note">
+      Retire the horizontal tab rail (the one that runs off the edge and cuts "Models" in half) and put
+      navigation in a permanent left column, grouped and always fully visible. The main area holds the
+      launcher or the open feature. This is how desktop apps you already use are built, and it scales
+      to any number of features.
+    </p>
+    <div class="frame pick"><div class="chrome"><i></i><i></i><i></i><span>homehub.local</span></div>
+      <div class="app" data-palette="cubby" data-theme="light">
+        <div class="shell">
+          <nav class="siderail">
+            <div style="display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-2) var(--sp-3)">
+              <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+              <span class="brand-name">Home Hub</span>
+            </div>
+            <div class="sr-item on"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span>Home</div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Chat<span class="tag">1</span></div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>Calendar<span class="tag">2</span></div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12l-5 5H4z"/></svg></span>Notes</div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m4 7 2 2 3-3"/><path d="M13 6h7M13 12h7"/></svg></span>Checklists</div>
+            <p class="sr-lbl">Create</p>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m21 15-5-5L5 21"/></svg></span>Images</div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></span>Studio</div>
+            <p class="sr-lbl">Household</p>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9h14v-9"/></svg></span>Smart Home</div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg></span>Files &amp; Photos</div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2"/></svg></span>Keys</div>
+            <p class="sr-lbl">Admin</p>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 4.5 3.4 7.6 8 9 4.6-1.4 8-4.5 8-9V6z"/></svg></span>Devices</div>
+            <div class="sr-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/></svg></span>Models</div>
+            <div style="margin-top:auto;display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2)">
+              <span class="avatar">K</span><span class="muted" style="font-size:var(--fs-xs)">kanishka · admin</span>
+            </div>
+          </nav>
+          <div class="main">
+            <h1 class="lc-greet" style="font-size:1.6rem">Good evening, kanishka</h1>
+            <p class="lc-status"><span class="lc-dot"></span>AI ready · Voice ready · 14 devices</p>
+            <button class="lc-tile hero" style="width:100%;margin-top:var(--sp-5)">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              <span class="lc-txt"><span class="lc-name">Start a chat</span><span class="lc-hint">qwen2.5-7b · runs on your hub</span></span>
+            </button>
+            <div class="lc-grid" style="grid-template-columns:repeat(3,1fr);margin-top:var(--sp-3)">
+              <button class="lc-tile"><span class="lc-name">Calendar</span><span class="lc-hint">2 events today</span></button>
+              <button class="lc-tile"><span class="lc-name">Notes</span><span class="lc-hint">4 on the board</span></button>
+              <button class="lc-tile"><span class="lc-name">Smart Home</span><span class="lc-hint">2 lights on</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="verdict">
+      <div><dt>Good</dt><dd class="good">All 11 features permanently visible, no cut-off rail, one click to anything. Best long-term fit.</dd></div>
+      <div><dt>Cost</dt><dd class="cost">Moderate — a new shell layout at ≥1080px; phone unchanged.</dd></div>
+      <div><dt>Limit</dt><dd>Spends ~210px of width on navigation.</dd></div>
+    </div>
+  </section>
+
+  <!-- ===================== D3 ===================== -->
+  <section>
+    <div class="opt-head"><span class="anchor">D3</span><h2>Live dashboard — content, not a menu</h2>
+      <span class="tagline t-work">largest</span></div>
+    <p class="sec-note">
+      Rather than tiles that only say where to go, the home screen <em>shows the house</em>: today's
+      events and chores, recent notes, device states, recent chats. Every card is a real answer, and its
+      header opens the full feature. This is the option that makes the wide screen worth having — and it
+      pairs naturally with the left rail from D2.
+    </p>
+    <div class="frame"><div class="chrome"><i></i><i></i><i></i><span>homehub.local</span></div>
+      <div class="app" data-palette="cubby" data-theme="light">
+        <div class="topbar">
+          <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+          <span class="brand-name">Home Hub</span><span class="spacer"></span>
+          <button class="btn btn-sm">All features</button><span class="avatar">K</span>
+        </div>
+        <div style="padding:var(--sp-5) var(--sp-6) var(--sp-6);background:var(--bg)">
+          <h1 class="lc-greet" style="font-size:1.6rem">Good evening, kanishka</h1>
+          <p class="lc-status" style="margin-bottom:var(--sp-5)"><span class="lc-dot"></span>AI ready · Voice ready · 14 devices</p>
+          <div class="dash">
+            <div class="dcard span2">
+              <div class="dhead"><span class="dtitle">Today</span><button class="btn btn-sm">Calendar →</button></div>
+              <div class="drow"><span class="dtime">15:00</span><span>Emma — dentist</span><span class="tag" style="margin-left:auto">Emma</span></div>
+              <div class="drow"><span class="dtime">18:30</span><span>Football training</span><span class="tag" style="margin-left:auto">Sam</span></div>
+              <div class="drow"><span class="dtime">—</span><span>Dishwasher</span><span class="tag" style="margin-left:auto">Sam · due</span></div>
+            </div>
+            <div class="dcard">
+              <div class="dhead"><span class="dtitle">Ask</span></div>
+              <div class="askbox" style="padding:var(--sp-2) var(--sp-3)">
+                <span class="ph" style="font-size:var(--fs-sm)">Ask anything…</span>
+                <button class="btn btn-primary btn-sm">Go</button>
+              </div>
+              <p class="muted" style="margin:var(--sp-3) 0 0;font-size:var(--fs-xs)">Last: “can you help me build games for kids”</p>
+            </div>
+            <div class="dcard">
+              <div class="dhead"><span class="dtitle">Noticeboard</span><button class="btn btn-sm">Notes →</button></div>
+              <div class="dnote" style="background:var(--note-yellow)">Bin day — green bin Tuesday</div>
+              <div class="dnote" style="background:var(--note-blue)">Guest wifi on the fridge</div>
+            </div>
+            <div class="dcard">
+              <div class="dhead"><span class="dtitle">Home</span><button class="btn btn-sm">Open →</button></div>
+              <div class="dev-row">Living room lamp<span class="sw on"></span></div>
+              <div class="dev-row">Kitchen blinds<span class="sw"></span></div>
+              <div class="dev-row">Back door<span class="tag" style="margin-left:auto">locked</span></div>
+            </div>
+            <div class="dcard">
+              <div class="dhead"><span class="dtitle">Shopping</span><button class="btn btn-sm">Lists →</button></div>
+              <div class="drow"><span>Milk, bread, orzo</span><span class="tag" style="margin-left:auto">6 left</span></div>
+              <div class="drow"><span>Feta, mint</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="verdict">
+      <div><dt>Good</dt><dd class="good">The home screen earns its place — you learn something by opening it. Strongest product feel.</dd></div>
+      <div><dt>Cost</dt><dd class="cost">Largest — each card needs a small summary endpoint and its own empty/loading states.</dd></div>
+      <div><dt>Limit</dt><dd>More surface to keep correct; worth doing after the launch blockers.</dd></div>
+    </div>
+  </section>
+
+  <!-- ===================== D4 ===================== -->
+  <section>
+    <div class="opt-head"><span class="anchor">D4</span><h2>Ask first</h2>
+      <span class="tagline t-work">small</span></div>
+    <p class="sec-note">
+      It's an AI appliance, so make the primary action typing. A composer sits on the home screen; type
+      and it opens the chat with your message already sent. Features become a quiet row underneath.
+      Fewest clicks for the thing you do most.
+    </p>
+    <div class="frame"><div class="chrome"><i></i><i></i><i></i><span>homehub.local</span></div>
+      <div class="app" data-palette="cubby" data-theme="light">
+        <div class="topbar">
+          <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9.5 20v-5h5v5"/></svg></span>
+          <span class="brand-name">Home Hub</span><span class="spacer"></span>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></button><span class="avatar">K</span>
+        </div>
+        <div style="padding:var(--sp-7) var(--sp-6) var(--sp-6);background:var(--bg);text-align:center">
+          <h1 class="lc-greet" style="font-size:1.9rem">Good evening, kanishka</h1>
+          <p class="lc-status" style="justify-content:center;margin-bottom:var(--sp-5)"><span class="lc-dot"></span>Everything's running on your hub</p>
+          <div style="max-width:620px;margin:0 auto">
+            <div class="askbox">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px;color:var(--accent)"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              <span class="ph">Ask anything, or tap the mic…</span>
+              <button class="btn btn-primary">Send</button>
+            </div>
+            <div class="quick" style="justify-content:center">
+              <span class="qchip">What's on today?</span>
+              <span class="qchip">Add to shopping list</span>
+              <span class="qchip">Turn off the lights</span>
+            </div>
+          </div>
+          <div class="lc-grid" style="grid-template-columns:repeat(6,1fr);gap:var(--sp-2);margin-top:var(--sp-7);text-align:center">
+            <button class="lc-tile" style="align-items:center;padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Calendar</span></button>
+            <button class="lc-tile" style="align-items:center;padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Notes</span></button>
+            <button class="lc-tile" style="align-items:center;padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Lists</span></button>
+            <button class="lc-tile" style="align-items:center;padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Home</span></button>
+            <button class="lc-tile" style="align-items:center;padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Images</span></button>
+            <button class="lc-tile" style="align-items:center;padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">More</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="verdict">
+      <div><dt>Good</dt><dd class="good">Zero clicks to the main action. Reads unmistakably as an AI appliance.</dd></div>
+      <div><dt>Cost</dt><dd class="cost">Small — reuse the composer, hand the text to sendMessage on submit.</dd></div>
+      <div><dt>Limit</dt><dd>Buries the other ten features a little; weakest for a shared family screen.</dd></div>
+    </div>
+  </section>
+
+  <!-- ===================== P11 ===================== -->
+  <section>
+    <div class="opt-head"><span class="anchor">P11</span><h2>Phone: bottom bar — the thing you couldn't see</h2>
+      <span class="tagline t-work">small</span></div>
+    <p class="sec-note">
+      Four everyday destinations in thumb reach, always present, with <b>More</b> opening the full
+      launcher. It doesn't replace the launcher — it sits alongside it, so nothing becomes unreachable.
+      Compare against the launcher-only version you have now.
+    </p>
+    <div class="phones">
+      <div>
+        <div class="phone"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="dark">
+            <div class="statusbar"><span>8:12</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="topbar" style="padding:7px var(--sp-3)">
+              <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span>
+              <span class="spacer"></span>
+              <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></button>
+              <span class="avatar">K</span>
+            </div>
+            <div class="screenbody" style="min-height:330px">
+              <h1 class="lc-greet" style="font-size:var(--fs-xl)">Good evening, kanishka</h1>
+              <p class="lc-status"><span class="lc-dot"></span>AI ready · Voice ready</p>
+              <div class="lc-grid" style="grid-template-columns:1fr 1fr;margin-top:var(--sp-4);gap:var(--sp-2)">
+                <button class="lc-tile" style="grid-column:1/-1;flex-direction:row;align-items:center;gap:var(--sp-3)">
+                  <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                  <span class="lc-txt"><span class="lc-name" style="font-size:var(--fs-sm)">Chat</span><span class="lc-hint" style="font-size:var(--fs-xs)">1 chat</span></span></button>
+                <button class="lc-tile" style="padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Calendar</span><span class="lc-hint" style="font-size:var(--fs-xs)">Events</span></button>
+                <button class="lc-tile" style="padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Notes</span><span class="lc-hint" style="font-size:var(--fs-xs)">Board</span></button>
+                <button class="lc-tile" style="padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Checklists</span><span class="lc-hint" style="font-size:var(--fs-xs)">Lists</span></button>
+                <button class="lc-tile" style="padding:var(--sp-3)"><span class="lc-name" style="font-size:var(--fs-sm)">Smart Home</span><span class="lc-hint" style="font-size:var(--fs-xs)">14 devices</span></button>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tb on"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9h14v-9"/></svg></span>Home</div>
+              <div class="tb"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Chat</div>
+              <div class="tb"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg></span>Calendar</div>
+              <div class="tb"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>More</div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>With</b> a bottom bar — Chat and Calendar reachable from anywhere, thumb-height.</p>
+      </div>
+      <div>
+        <div class="phone"><div class="phone-inner">
+          <div class="app" data-palette="cubby" data-theme="dark">
+            <div class="statusbar"><span>8:12</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="topbar" style="padding:7px var(--sp-3)">
+              <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+              <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg></span>
+              <span class="spacer"></span>
+              <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></button>
+              <span class="avatar">K</span>
+            </div>
+            <div class="screenbody" style="min-height:378px">
+              <div style="display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-3)">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--fs-lg)">Chat</span>
+                <span class="spacer"></span>
+                <span class="qchip" style="background:var(--accent-soft);color:var(--accent);border-color:transparent">House default ⌄</span>
+                <span class="qchip">🕘 1</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:var(--sp-3)">
+                <span class="muted" style="font-size:var(--fs-xs)">You</span>
+                <div style="background:var(--accent);color:var(--accent-ink);padding:9px 13px;border-radius:var(--r-lg);border-bottom-right-radius:6px;font-size:var(--fs-sm);max-width:86%">can you help me build games for kids</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-start">
+                <span class="muted" style="font-size:var(--fs-xs)">Assistant</span>
+                <div style="background:var(--surface);border:1px solid var(--border);padding:9px 13px;border-radius:var(--r-lg);border-bottom-left-radius:6px;font-size:var(--fs-sm)">Absolutely — what age group are you aiming at?</div>
+              </div>
+            </div>
+            <div style="margin:var(--sp-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);box-shadow:var(--shadow-md);padding:var(--sp-2) var(--sp-3);display:flex;align-items:center;gap:var(--sp-2)">
+              <span class="muted" style="flex:1;font-size:var(--fs-sm)">Message…</span>
+              <button class="btn btn-primary btn-sm">Send</button>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Without</b> (what's live) — back arrow returns home; the composer floats and grows to four lines.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="opt-head"><span class="anchor">Pick</span><h2>My recommendation</h2></div>
+    <p class="sec-note">
+      <b>D2 now, D3 after launch.</b> The left rail fixes the actual complaint — a cut-off tab rail and a
+      layout that ignores the width — for moderate effort, and it's the shell D3's cards would later drop
+      into. D4's home composer is cheap and could be added to either as the hero. On the phone I'd take
+      the bottom bar: it costs little and puts Chat one thumb-tap away from anywhere.
+    </p>
+    <div class="sheet">
+      <ul>
+        <li><span class="anchor">D1</span> keep as is / not enough <span class="rule"></span></li>
+        <li><span class="anchor">D2</span> left rail — build it? <span class="rule"></span></li>
+        <li><span class="anchor">D3</span> live dashboard — now or after launch? <span class="rule"></span></li>
+        <li><span class="anchor">D4</span> home composer — add as the hero? <span class="rule"></span></li>
+        <li><span class="anchor">P11</span> bottom bar — yes / no <span class="rule"></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    Specimens use HomeHub's real tokens from <code style="font-family:var(--rv-mono)">home-hub/app/static/style.css</code>.
+    D1 is live; D2–D4 and the bottom bar are proposals — no app code has been changed for them.
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var pal = 'cubby', thm = 'light';
+    var apps = document.querySelectorAll('.app');
+    function apply() {
+      apps.forEach(function (a) { a.setAttribute('data-palette', pal); a.setAttribute('data-theme', thm); });
+    }
+    function wire(id, key, set) {
+      var host = document.getElementById(id);
+      if (!host) return;
+      host.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-' + key + ']');
+        if (!b) return;
+        set(b.dataset[key]);
+        host.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        apply();
+      });
+    }
+    wire('pal', 'pal', function (v) { pal = v; });
+    wire('thm', 'thm', function (v) { thm = v; });
+    apply();
+  })();
+</script>
+</body>
+</html>
