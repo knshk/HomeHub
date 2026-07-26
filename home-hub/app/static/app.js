@@ -1108,6 +1108,12 @@ const COMPOSER_MAX_LINES = 4;
 function autoGrowComposer() {
   const ta = $('#chat-input');
   if (!ta) return;
+  ta.style.height = 'auto';
+  // While the chat panel is hidden the textarea isn't laid out, so scrollHeight
+  // is 0 — setting a height from it collapsed the box and clipped the
+  // placeholder until the first keystroke. Leave the natural rows=1 height and
+  // re-measure once the panel is actually on screen.
+  if (!ta.scrollHeight) return;
   const cs = getComputedStyle(ta);
   const line = parseFloat(cs.lineHeight) || 20;
   const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
@@ -1148,7 +1154,9 @@ function selectTab(tab) {
 
   switch (tab) {
     case 'launcher':   renderLauncher(); break;
-    case 'chat':       loadConversations(); break;
+    // Size the composer now the panel is on screen (it can't be measured while
+    // hidden), then load the conversation list.
+    case 'chat':       autoGrowComposer(); loadConversations(); break;
     case 'notes':      loadNotes(); break;
     case 'checklists': loadChecklists(); break;
     case 'calendar':   loadCalendar(); break;
@@ -2642,7 +2650,15 @@ function onCalMonthClick(e) {
   if (e.target.closest('[data-cal-today]')) {
     const now = new Date();
     CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1; CAL_DAY = now.getDate();
-    loadCalendar();
+    // Re-render, then bring today into view and flash it, so the button gives
+    // feedback even when the current period was already on screen.
+    Promise.resolve(loadCalendar()).then(() => {
+      const cell = $('#cal-month .cal-today') || $('#cal-month .cal-yr-d.today');
+      if (!cell) return;
+      cell.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      cell.classList.add('cal-flash');
+      setTimeout(() => cell.classList.remove('cal-flash'), 900);
+    });
     return;
   }
 

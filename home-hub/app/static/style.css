@@ -1568,3 +1568,41 @@ body.modal-open { overflow: hidden; }
   .cal-nav-steps .btn { padding: 0 10px; }
   .cal-nav-title { font-size: var(--fs-md); }
 }
+
+/* =========================================================================
+   Chat: stop the panel overflowing the viewport horizontally.
+   .chat-layout is a grid, and a `1fr` track resolves to minmax(auto, 1fr) —
+   the `auto` minimum is the item's MIN-CONTENT width, so the column could not
+   shrink below it. The two header chips (max-width 46vw each) plus the title
+   and gaps exceeded 100vw, which widened the whole column: right-aligned user
+   bubbles and the composer's Send button were pushed off the right edge.
+   minmax(0, 1fr) + min-width:0 lets the track shrink; the chips then ellipsize
+   as intended instead of forcing width.
+   ========================================================================= */
+.chat-layout { grid-template-columns: minmax(0, 1fr); }
+.chat-main { min-width: 0; }
+.ch-bar { min-width: 0; flex-wrap: nowrap; }
+.ch-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-chip { min-width: 0; flex: 0 1 auto; max-width: 38vw; }
+.mini-chip .txt { min-width: 0; }
+.composer, .composer-row { min-width: 0; max-width: 100%; }
+
+@media (min-width: 820px) {
+  /* Sidebar column keeps its fixed width; only the main column may shrink. */
+  .chat-layout { grid-template-columns: 280px minmax(0, 1fr); }
+}
+
+/* Today: brief highlight so the button visibly does something even when the
+   current period was already on screen. */
+@keyframes calFlash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  35%      { box-shadow: 0 0 0 4px var(--accent-soft); }
+}
+.cal-flash { animation: calFlash .9s ease; }
+@media (prefers-reduced-motion: reduce) { .cal-flash { animation: none; } }
+
+/* The view switcher clipped its own contents (overflow:hidden + shrinking
+   buttons), which is why "Year" was invisible on a phone. Let it size to its
+   buttons and never shrink them away. */
+.cal-views { overflow: visible; flex: 0 0 auto; }
+.cal-view-btn { flex: 0 0 auto; white-space: nowrap; }
