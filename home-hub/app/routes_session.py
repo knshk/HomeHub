@@ -94,6 +94,46 @@ def claim(response: Response, request: Request, payload: dict = Body(default={})
         conn.close()
 
 
+@router.post("/session/elevate")
+def elevate(response: Response, request: Request, payload: dict = Body(default={})):
+    """Promote the CURRENT device to admin by entering the admin PIN.
+
+    Works from any device / PWA. If this browser has no device yet, a `username`
+    bootstraps one first. By design there is NO attempt limit — infinite tries,
+    nothing gets locked out (family usability; the hub is LAN-only).
+    """
+    auth.enforce_csrf(request)
+    pin = (payload.get("pin") or "").strip()
+    username = (payload.get("username") or "").strip()
+
+    if not auth.admin_pin_is_set():
+        raise HubError(409, "No admin PIN is set yet. An admin can set one in "
+                       "Settings, or use the admin token.", "no_admin_pin")
+    if not auth.verify_admin_pin(pin):
+        raise HubError(403, "Incorrect PIN", "bad_pin")  # no lockout, try again
+
+    token = auth.read_device_token(request)
+    conn = db.connect()
+    try:
+        device = db.get_device_by_hash(conn, auth.sha256_hex(token)) if token else None
+        if device is None:
+            if not username:
+                raise HubError(400, "username is required on a new device",
+                               "bad_request")
+            token = auth.new_device_token()
+            device_id = auth.register_new_device(conn, token, username)
+            auth.set_device_cookie(response, token)
+        else:
+            device_id = device["id"]
+            username = username or device["username"]
+            auth.set_device_cookie(response, token)  # refresh
+        auth.make_admin(conn, device_id, username)
+        device = db.get_device(conn, device_id)
+        return auth.device_to_me(device)
+    finally:
+        conn.close()
+
+
 @router.post("/session/logout")
 def logout(response: Response, request: Request):
     """Clear the device cookie on this browser. Device record is retained."""

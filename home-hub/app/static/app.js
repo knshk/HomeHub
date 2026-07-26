@@ -251,8 +251,56 @@ function openSettings() {
     palRow,
     el('label', { class: 'field-label' }, 'Appearance'),
     modeRow,
+    settingsAdminSection(),
     el('div', { class: 'modal-actions' }, el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Done')),
   ));
+}
+
+/* Admin PIN in Settings: non-admins unlock admin from this device with the PIN;
+ * admins set/change the PIN. Lets any user act as admin from any device / PWA. */
+function settingsAdminSection() {
+  const wrap = el('div', { class: 'settings-admin' }, el('hr', { class: 'settings-sep' }));
+  const msg = el('p', { class: 'form-error', hidden: true });
+
+  if (isAdmin()) {
+    const input = el('input', { class: 'field', type: 'password', inputmode: 'numeric',
+      autocomplete: 'off', placeholder: 'New admin PIN (4–32 digits)' });
+    const status = el('p', { class: 'muted', style: 'margin:.3rem 0 0' }, 'Admin PIN: …');
+    api('/api/admin/pin')
+      .then((r) => { status.textContent = r.set ? 'Admin PIN: set' : 'Admin PIN: not set yet'; })
+      .catch(() => { status.textContent = ''; });
+    const save = el('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+      msg.hidden = true;
+      try {
+        await api('/api/admin/pin', { method: 'PUT', body: { pin: input.value.trim() } });
+        toast('Admin PIN updated', 'success');
+        input.value = ''; status.textContent = 'Admin PIN: set';
+      } catch (e) { msg.textContent = e.message; msg.hidden = false; }
+    } }, 'Save PIN');
+    wrap.append(
+      el('label', { class: 'field-label' }, 'Admin PIN'),
+      el('p', { class: 'muted', style: 'margin:0 0 .4rem' },
+        'Anyone can become admin from any device by entering this PIN.'),
+      input, save, msg, status);
+  } else {
+    const input = el('input', { class: 'field', type: 'password', inputmode: 'numeric',
+      autocomplete: 'off', placeholder: 'Admin PIN' });
+    const unlock = el('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+      msg.hidden = true;
+      try {
+        const me = await api('/api/session/elevate', { method: 'POST', body: { pin: input.value.trim() } });
+        toast('You are now admin on this device', 'success');
+        closeModal();
+        onMe(me);
+      } catch (e) { msg.textContent = e.message; msg.hidden = false; }
+    } }, 'Unlock admin');
+    wrap.append(
+      el('label', { class: 'field-label' }, 'Admin access'),
+      el('p', { class: 'muted', style: 'margin:0 0 .4rem' },
+        'Enter the admin PIN to manage the hub from this device.'),
+      input, unlock, msg);
+  }
+  return wrap;
 }
 
 /* ---- global UI wiring (gate, tabs, modal, logout) ---- */
@@ -282,13 +330,18 @@ function wireGlobalUI() {
   // Gate: "Find your Home Hub" connection panel (sits above the username step)
   wireGateConnect();
 
-  // Gate: admin claim
+  // Gate: admin — PIN elevate (primary) or admin token (first-time setup)
   $('#gate-admin-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = $('#gate-admin-username').value.trim();
-    const admin_token = $('#gate-admin-token').value;
-    if (!username || !admin_token) return;
-    await gateAction(() => api('/api/session/claim', { method: 'POST', body: { username, admin_token } }));
+    const pin = ($('#gate-admin-pin')?.value || '').trim();
+    const admin_token = ($('#gate-admin-token')?.value || '').trim();
+    if (!username) return;
+    if (pin) {
+      await gateAction(() => api('/api/session/elevate', { method: 'POST', body: { username, pin } }));
+    } else if (admin_token) {
+      await gateAction(() => api('/api/session/claim', { method: 'POST', body: { username, admin_token } }));
+    }
   });
 
   // Tabs
@@ -415,11 +468,18 @@ function normalizeHubAddress(raw) {
 function discoveryCandidates() {
   const port = location.port || '';
   const withPort = (host) => port ? `http://${host}:${port}` : `http://${host}`;
-  return [
+  const list = [
     withPort('homehub.local'),
     'http://llm.home',
     withPort('llm.local'),
   ];
+  // Try the last hub this browser/PWA connected to first (auto-reconnect).
+  let remembered = null;
+  try { remembered = localStorage.getItem('hub-origin'); } catch (e) { /* ignore */ }
+  if (remembered && remembered !== location.origin && !list.includes(remembered)) {
+    list.unshift(remembered);
+  }
+  return list;
 }
 
 function connectMsg(text, kind) {
@@ -545,6 +605,8 @@ function wireGateConnect() {
 function onMe(me) {
   State.me = me;
   State.privileges = new Set(me.privileges || []);
+  // Remember this hub so the PWA / a bookmark can auto-reconnect to it later.
+  try { localStorage.setItem('hub-origin', location.origin); } catch (e) { /* ignore */ }
 
   $('#gate').hidden = true;
   $('#app').hidden = false;

@@ -152,6 +152,32 @@ async def delete_model(alias: str, device=Depends(_admin)):
     return await integration.gateway_admin_json("DELETE", f"/admin/models/{alias}")
 
 
+# ---------------------------------------------------------------------------
+# Admin PIN — set/change/clear the PIN that lets any user become admin from any
+# device (POST /api/session/elevate). The PIN itself is never returned.
+# ---------------------------------------------------------------------------
+@router.get("/pin")
+def admin_pin_status(device=Depends(_admin)):
+    return {"set": auth.admin_pin_is_set()}
+
+
+@router.put("/pin")
+def set_admin_pin(payload: dict = Body(default={}), device=Depends(_admin)):
+    pin = (payload.get("pin") or "").strip()
+    if len(pin) < 4:
+        raise HubError(400, "PIN must be at least 4 digits", "bad_request")
+    if len(pin) > 32:
+        raise HubError(400, "PIN is too long (max 32)", "bad_request")
+    auth.set_admin_pin(pin)
+    return {"set": True}
+
+
+@router.delete("/pin")
+def clear_admin_pin(device=Depends(_admin)):
+    auth.clear_admin_pin()
+    return {"set": auth.admin_pin_is_set()}
+
+
 @router.get("/resources")
 async def resources(device=Depends(_admin)):
     return await integration.gateway_admin_json("GET", "/admin/resources")

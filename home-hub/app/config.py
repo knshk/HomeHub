@@ -63,6 +63,10 @@ GATEWAY_URL = os.getenv("GATEWAY_URL", "http://127.0.0.1:8080").rstrip("/")
 HUB_GATEWAY_KEY = os.getenv("HUB_GATEWAY_KEY", "")
 HUB_ADMIN_TOKEN = os.getenv("HUB_ADMIN_TOKEN", "")
 HUB_BOOTSTRAP_TOKEN = os.getenv("HUB_BOOTSTRAP_TOKEN", "")
+# Optional bootstrap admin PIN. An admin can set/override this in-app (stored
+# encrypted in the secret store); this env value is the fallback when none is
+# stored. Any user can become admin from any device by entering the PIN.
+HUB_ADMIN_PIN = os.getenv("HUB_ADMIN_PIN", "")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen2.5-7b")
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")

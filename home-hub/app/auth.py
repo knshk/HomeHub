@@ -14,7 +14,7 @@ import secrets
 
 from fastapi import Depends, Request, Response
 
-from . import config, db
+from . import config, db, secrets_store
 from .errors import HubError
 
 
@@ -113,6 +113,45 @@ def verify_admin_token(token: str) -> bool:
     if config.HUB_BOOTSTRAP_TOKEN and constant_eq(token, config.HUB_BOOTSTRAP_TOKEN):
         return True
     return False
+
+
+# ----------------------------------------------------------------------------
+# Admin PIN — any user can elevate to admin from any device by entering it.
+# The PIN is stored encrypted (secret store, namespace 'admin'); an env value
+# (HUB_ADMIN_PIN) is the bootstrap fallback when none is stored. By design there
+# is NO attempt limit / lockout on PIN entry (family usability over hardening,
+# LAN-only). The PIN is never returned by any endpoint.
+# ----------------------------------------------------------------------------
+_ADMIN_PIN_NS = "admin"
+_ADMIN_PIN_NAME = "pin"
+
+
+def get_admin_pin() -> str | None:
+    """Stored PIN (secret store) if set, else the env bootstrap PIN, else None."""
+    try:
+        stored = secrets_store.get_secret(_ADMIN_PIN_NS, _ADMIN_PIN_NAME)
+    except Exception:
+        stored = None
+    return (stored or config.HUB_ADMIN_PIN) or None
+
+
+def admin_pin_is_set() -> bool:
+    return bool(get_admin_pin())
+
+
+def set_admin_pin(pin: str) -> None:
+    secrets_store.set_secret(_ADMIN_PIN_NS, _ADMIN_PIN_NAME, pin.strip())
+
+
+def clear_admin_pin() -> None:
+    secrets_store.delete_secret(_ADMIN_PIN_NS, _ADMIN_PIN_NAME)
+
+
+def verify_admin_pin(pin: str) -> bool:
+    stored = get_admin_pin()
+    if not stored or not pin:
+        return False
+    return constant_eq(pin.strip(), stored.strip())
 
 
 # ----------------------------------------------------------------------------

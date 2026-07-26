@@ -102,16 +102,22 @@
         I'm the admin
       </button>
 
-      <!-- Admin claim (hidden until toggled) -->
+      <!-- Admin: enter with a PIN (any device), or first-time token (hidden until toggled) -->
       <form id="gate-admin-form" class="gate-form" autocomplete="off" hidden>
         <label class="field-label" for="gate-admin-username">Username</label>
         <input id="gate-admin-username" class="field" name="username" type="text"
-               autocapitalize="none" autocomplete="username" placeholder="admin name"
+               autocapitalize="none" autocomplete="username" placeholder="your name"
                maxlength="40" required>
-        <label class="field-label" for="gate-admin-token">Admin token</label>
-        <input id="gate-admin-token" class="field" name="admin_token" type="password"
-               autocomplete="off" placeholder="admin or bootstrap token" required>
-        <button type="submit" class="btn btn-primary btn-block">Claim admin</button>
+        <label class="field-label" for="gate-admin-pin">Admin PIN</label>
+        <input id="gate-admin-pin" class="field" name="pin" type="password"
+               inputmode="numeric" autocomplete="off" placeholder="admin PIN">
+        <button type="submit" class="btn btn-primary btn-block">Enter as admin</button>
+        <details class="gate-admin-adv">
+          <summary>First-time setup (admin token)</summary>
+          <label class="field-label" for="gate-admin-token">Admin token</label>
+          <input id="gate-admin-token" class="field" name="admin_token" type="password"
+                 autocomplete="off" placeholder="admin or bootstrap token">
+        </details>
         <button id="gate-hide-admin" type="button" class="btn-link">Back</button>
       </form>
 

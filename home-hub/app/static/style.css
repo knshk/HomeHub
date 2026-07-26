@@ -1129,3 +1129,11 @@ body.modal-open { overflow: hidden; }
 @media (max-width: 640px) {
   .home-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---- Admin PIN (settings + gate) ------------------------------------- */
+.settings-sep { border: none; border-top: 1px solid var(--border); margin: var(--sp-4) 0 var(--sp-3); }
+.settings-admin .field { margin-bottom: var(--sp-2); }
+.settings-admin .btn { margin-top: var(--sp-1); }
+.gate-admin-adv { margin: var(--sp-2) 0; }
+.gate-admin-adv summary { color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
+.gate-admin-adv[open] summary { margin-bottom: var(--sp-2); }
