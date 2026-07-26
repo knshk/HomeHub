@@ -341,7 +341,13 @@ select.field, .role-select {
  * ========================================================================= */
 .content { max-width: var(--maxw); margin: 0 auto; padding: var(--sp-5) var(--sp-4) var(--sp-8); }
 .panel { animation: viewIn .28s ease both; }
-@keyframes viewIn { from { transform: translateY(8px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+/* NB: the end state must be `transform: none`, not translateY(0). With
+   animation-fill-mode:both the final value persists, and ANY transform value
+   makes the panel a stacking context AND the containing block for its
+   position:fixed descendants — which trapped the chat sheets under the scrim
+   (taps hit the scrim, so "+ New" appeared dead) and anchored them to the page
+   instead of the viewport. `none` is visually identical and has neither effect. */
+@keyframes viewIn { from { transform: translateY(8px); opacity: .6; } to { transform: none; opacity: 1; } }
 .panel-head {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: var(--sp-3); margin-bottom: var(--sp-5);
@@ -1426,4 +1432,65 @@ body.modal-open { overflow: hidden; }
   .lc-prev-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lc-prev-meta { color: var(--muted); font-size: var(--fs-xs); flex: 0 0 auto; }
   .lc-prev-item.overdue .lc-prev-meta { color: var(--danger); font-weight: 700; }
+}
+
+/* =========================================================================
+   Calendar: week / month / year views
+   ========================================================================= */
+.cal-views { display: inline-flex; margin-left: auto; border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); overflow: hidden; }
+.cal-view-btn {
+  appearance: none; border: 0; background: transparent; color: var(--muted);
+  font: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 6px 12px;
+  min-height: 32px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.cal-view-btn + .cal-view-btn { border-left: 1px solid var(--border); }
+.cal-view-btn.on { background: var(--accent); color: var(--accent-ink); }
+.cal-view-btn:hover:not(.on) { background: var(--surface-2); color: var(--text); }
+
+/* --- week: one roomy row per day --- */
+.cal-week { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cal-wk-day {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2);
+  padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface); min-height: 56px;
+}
+.cal-wk-day.cal-today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.cal-wk-head { display: flex; align-items: baseline; gap: var(--sp-2); flex: 0 0 84px; }
+.cal-wk-dow { font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); }
+.cal-wk-num { font-family: var(--font-head); font-size: var(--fs-lg); font-weight: 700; }
+.cal-wk-day.cal-today .cal-wk-num { color: var(--accent); }
+.cal-wk-empty { color: var(--faint); font-size: var(--fs-sm); }
+.cal-wk-day .cal-chip { width: auto; flex: 0 1 auto; border-radius: var(--r-pill); padding: 3px 10px; }
+
+/* --- year: twelve mini months --- */
+.cal-year { display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr)); }
+.cal-yr-month {
+  display: block; width: 100%; text-align: left; font: inherit; color: var(--text);
+  padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface); cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.cal-yr-month:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.cal-yr-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.cal-yr-name { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-sm); }
+.cal-yr-count { margin-left: auto; font-size: var(--fs-xs); font-weight: 800;
+  color: var(--accent); background: var(--accent-soft); border-radius: var(--r-pill); padding: 1px 7px; }
+.cal-yr-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-yr-wd { font-size: 8.5px; color: var(--faint); text-align: center; font-weight: 700; }
+.cal-yr-d {
+  aspect-ratio: 1; display: grid; place-items: center; border-radius: 4px;
+  font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.cal-yr-d.pad { visibility: hidden; }
+.cal-yr-d.has { background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+.cal-yr-d.today { outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
+
+@media (max-width: 640px) {
+  .cal-views { margin-left: 0; width: 100%; }
+  .cal-view-btn { flex: 1; }
+  .cal-wk-head { flex: 0 0 100%; }
+  .cal-year { grid-template-columns: 1fr 1fr; }
 }

@@ -430,6 +430,7 @@ function wireGlobalUI() {
   $('#chat-history-chip')?.addEventListener('click', () => openSheet('history'));
   $('#sheet-scrim')?.addEventListener('click', closeSheets);
   $('#conversation-list')?.addEventListener('click', closeSheets);
+  $('#chat-new')?.addEventListener('click', closeSheets);   // starting a chat closes the list
   $('#chat-model')?.addEventListener('change', () => { syncChatChips(); closeSheets(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
 
@@ -808,7 +809,7 @@ function applyStatusUI() {
       ci.placeholder = 'Chat is offline — the local model is stopped.';
     } else if (ci.placeholder && ci.placeholder.startsWith('Chat is offline')) {
       ci.disabled = false;
-      ci.placeholder = 'Message the model… or tap the mic';
+      ci.placeholder = 'Ask anything…';
     }
   }
   if (cs && !st.chat) cs.disabled = true;
@@ -2253,6 +2254,8 @@ let CAL_EVENTS = [];    // occurrences in the visible month
 let CAL_UPCOMING = [];  // occurrences in the next 14 days
 let CHORES = [];
 let CAL_YEAR = null, CAL_MONTH = null;  // visible month (1-12); set on first load
+let CAL_DAY = null;                     // anchor day, used by the week view
+let CAL_VIEW = 'month';                 // 'week' | 'month' | 'year'
 
 const CAL_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -2295,14 +2298,13 @@ async function loadCalendar() {
   if (!State.me || State.me.status !== 'approved') return;
   if (CAL_YEAR == null) {
     const now = new Date();
-    CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1;
+    CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1; CAL_DAY = now.getDate();
   }
   // show/hide write buttons depending on privilege (server still enforces)
   $('#cal-add-event').hidden = !calCanWrite();
   $('#chore-add').hidden = !calCanWrite();
 
-  const first = `${CAL_YEAR}-${pad2(CAL_MONTH)}-01`;
-  const last = `${CAL_YEAR}-${pad2(CAL_MONTH)}-${pad2(new Date(CAL_YEAR, CAL_MONTH, 0).getDate())}`;
+  const [first, last] = calRange();
   const today = new Date();
   const horizon = new Date(today); horizon.setDate(horizon.getDate() + 13);  // 14 days incl. today
   try {
@@ -2316,7 +2318,7 @@ async function loadCalendar() {
     toast(e.message, 'error');
     CAL_EVENTS = []; CAL_UPCOMING = []; CHORES = [];
   }
-  renderCalMonth();
+  renderCalendarView();
   renderCalUpcoming();
   renderChores();
 }
@@ -2457,22 +2459,149 @@ function calChip(ev, { withTime = true } = {}) {
   }, label);
 }
 
-function renderCalMonth() {
-  const wrap = $('#cal-month');
-  wrap.innerHTML = '';
+/* ---- view plumbing: week | month | year -------------------------------- */
+function calRefDate() { return new Date(CAL_YEAR, CAL_MONTH - 1, CAL_DAY || 1); }
 
+function calWeekStart(d) {
+  const s = new Date(d);
+  s.setDate(s.getDate() - s.getDay());   // weeks run Sun..Sat, matching CAL_WEEKDAYS
+  s.setHours(0, 0, 0, 0);
+  return s;
+}
+
+/** The [start, end] the current view needs fetched. */
+function calRange() {
+  if (CAL_VIEW === 'week') {
+    const s = calWeekStart(calRefDate());
+    const e = new Date(s); e.setDate(e.getDate() + 6);
+    return [ymd(s), ymd(e)];
+  }
+  if (CAL_VIEW === 'year') return [`${CAL_YEAR}-01-01`, `${CAL_YEAR}-12-31`];
+  const first = `${CAL_YEAR}-${pad2(CAL_MONTH)}-01`;
+  const last = `${CAL_YEAR}-${pad2(CAL_MONTH)}-${pad2(new Date(CAL_YEAR, CAL_MONTH, 0).getDate())}`;
+  return [first, last];
+}
+
+/** Step one period in the current view's units. */
+function calStep(dir) {
+  if (CAL_VIEW === 'week') {
+    const d = calRefDate();
+    d.setDate(d.getDate() + dir * 7);
+    CAL_YEAR = d.getFullYear(); CAL_MONTH = d.getMonth() + 1; CAL_DAY = d.getDate();
+    return;
+  }
+  if (CAL_VIEW === 'year') { CAL_YEAR += dir; return; }
+  CAL_MONTH += dir;
+  if (CAL_MONTH < 1) { CAL_MONTH = 12; CAL_YEAR -= 1; }
+  if (CAL_MONTH > 12) { CAL_MONTH = 1; CAL_YEAR += 1; }
+}
+
+function calEventsByDate() {
   const byDate = new Map();
   for (const ev of CAL_EVENTS) {
     if (!byDate.has(ev.date)) byDate.set(ev.date, []);
     byDate.get(ev.date).push(ev);
   }
+  return byDate;
+}
 
-  const nav = el('div', { class: 'cal-nav' },
-    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: 'Previous month', dataset: { calNav: '-1' } }, '←'),
-    el('strong', { class: 'cal-nav-title' }, `${CAL_MONTHS[CAL_MONTH - 1]} ${CAL_YEAR}`),
-    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: 'Next month', dataset: { calNav: '1' } }, '→'),
+/** Shared nav row: step, title, Today, and the view switcher. */
+function calNavBar(title, prevTitle, nextTitle) {
+  return el('div', { class: 'cal-nav' },
+    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: prevTitle, dataset: { calNav: '-1' } }, '←'),
+    el('strong', { class: 'cal-nav-title' }, title),
+    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: nextTitle, dataset: { calNav: '1' } }, '→'),
     el('button', { type: 'button', class: 'btn btn-ghost btn-sm', dataset: { calToday: '1' } }, 'Today'),
+    el('div', { class: 'cal-views' }, ...[['week', 'Week'], ['month', 'Month'], ['year', 'Year']].map(
+      ([v, label]) => el('button', {
+        type: 'button', class: 'cal-view-btn' + (CAL_VIEW === v ? ' on' : ''),
+        dataset: { calView: v }, 'aria-pressed': String(CAL_VIEW === v),
+      }, label))),
   );
+}
+
+/** Dispatch to the active view. */
+function renderCalendarView() {
+  if (CAL_VIEW === 'week') return renderCalWeek();
+  if (CAL_VIEW === 'year') return renderCalYear();
+  return renderCalMonth();
+}
+
+function renderCalWeek() {
+  const wrap = $('#cal-month');
+  wrap.innerHTML = '';
+  const byDate = calEventsByDate();
+  const s = calWeekStart(calRefDate());
+  const e = new Date(s); e.setDate(e.getDate() + 6);
+  const short = (d) => `${d.getDate()} ${CAL_MONTHS[d.getMonth()].slice(0, 3)}`;
+  const title = `${short(s)} – ${short(e)} ${e.getFullYear()}`;
+  const todayStr = ymd(new Date());
+
+  const list = el('div', { class: 'cal-week' });
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(s); d.setDate(s.getDate() + i);
+    const ds = ymd(d);
+    const evs = byDate.get(ds) || [];
+    const day = el('div', {
+      class: 'cal-wk-day' + (ds === todayStr ? ' cal-today' : ''),
+      dataset: { calDate: ds },
+      title: calCanWrite() ? 'Click to add an event' : null,
+    },
+      el('div', { class: 'cal-wk-head' },
+        el('span', { class: 'cal-wk-dow' }, CAL_WEEKDAYS[d.getDay()]),
+        el('span', { class: 'cal-wk-num' }, d.getDate()),
+      ),
+    );
+    if (!evs.length) day.append(el('span', { class: 'cal-wk-empty' }, 'Nothing planned'));
+    else for (const ev of evs) day.append(calChip(ev));
+    list.append(day);
+  }
+  wrap.append(calNavBar(title, 'Previous week', 'Next week'), list);
+}
+
+function renderCalYear() {
+  const wrap = $('#cal-month');
+  wrap.innerHTML = '';
+  const byDate = calEventsByDate();
+  const todayStr = ymd(new Date());
+  const grid = el('div', { class: 'cal-year' });
+
+  for (let m = 1; m <= 12; m++) {
+    const mini = el('button', {
+      type: 'button', class: 'cal-yr-month', dataset: { calMonth: String(m) },
+      title: `Open ${CAL_MONTHS[m - 1]}`,
+    });
+    let count = 0;
+    const g = el('div', { class: 'cal-yr-grid' });
+    for (const wd of CAL_WEEKDAYS) g.append(el('span', { class: 'cal-yr-wd' }, wd.charAt(0)));
+    const firstDow = new Date(CAL_YEAR, m - 1, 1).getDay();
+    const dim = new Date(CAL_YEAR, m, 0).getDate();
+    for (let i = 0; i < firstDow; i++) g.append(el('span', { class: 'cal-yr-d pad' }));
+    for (let d = 1; d <= dim; d++) {
+      const ds = `${CAL_YEAR}-${pad2(m)}-${pad2(d)}`;
+      const n = (byDate.get(ds) || []).length;
+      count += n;
+      g.append(el('span', {
+        class: 'cal-yr-d' + (n ? ' has' : '') + (ds === todayStr ? ' today' : ''),
+        title: n ? `${n} event${n === 1 ? '' : 's'}` : null,
+      }, d));
+    }
+    mini.append(
+      el('div', { class: 'cal-yr-head' },
+        el('span', { class: 'cal-yr-name' }, CAL_MONTHS[m - 1]),
+        count ? el('span', { class: 'cal-yr-count' }, count) : null),
+      g);
+    grid.append(mini);
+  }
+  wrap.append(calNavBar(String(CAL_YEAR), 'Previous year', 'Next year'), grid);
+}
+
+function renderCalMonth() {
+  const wrap = $('#cal-month');
+  wrap.innerHTML = '';
+
+  const byDate = calEventsByDate();
+  const nav = calNavBar(`${CAL_MONTHS[CAL_MONTH - 1]} ${CAL_YEAR}`, 'Previous month', 'Next month');
 
   const grid = el('div', { class: 'cal-grid' });
   for (const wd of CAL_WEEKDAYS) grid.append(el('div', { class: 'cal-wd' }, wd));
@@ -2497,24 +2626,32 @@ function renderCalMonth() {
 }
 
 function onCalMonthClick(e) {
+  const view = e.target.closest('[data-cal-view]');
+  if (view) { CAL_VIEW = view.dataset.calView; loadCalendar(); return; }
+
   const nav = e.target.closest('[data-cal-nav]');
-  if (nav) {
-    CAL_MONTH += Number(nav.dataset.calNav);
-    if (CAL_MONTH < 1) { CAL_MONTH = 12; CAL_YEAR -= 1; }
-    if (CAL_MONTH > 12) { CAL_MONTH = 1; CAL_YEAR += 1; }
-    loadCalendar();
-    return;
-  }
+  if (nav) { calStep(Number(nav.dataset.calNav)); loadCalendar(); return; }
+
   if (e.target.closest('[data-cal-today]')) {
     const now = new Date();
-    CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1;
+    CAL_YEAR = now.getFullYear(); CAL_MONTH = now.getMonth() + 1; CAL_DAY = now.getDate();
     loadCalendar();
     return;
   }
+
+  // Year view: a month opens that month.
+  const mon = e.target.closest('[data-cal-month]');
+  if (mon) {
+    CAL_MONTH = Number(mon.dataset.calMonth); CAL_DAY = 1; CAL_VIEW = 'month';
+    loadCalendar();
+    return;
+  }
+
   if (!calCanWrite()) return;
   const chip = e.target.closest('.cal-chip');
   if (chip) { openEventEditor(chip.dataset.evId); return; }
-  const day = e.target.closest('.cal-day[data-cal-date]');
+  // Month grid cells and week-view days both carry data-cal-date.
+  const day = e.target.closest('[data-cal-date]');
   if (day) openEventEditor(null, day.dataset.calDate);
 }
 
