@@ -94,6 +94,42 @@ def claim(response: Response, request: Request, payload: dict = Body(default={})
         conn.close()
 
 
+@router.post("/session/setup")
+def setup(response: Response, request: Request, payload: dict = Body(default={})):
+    """First-run: create the FIRST admin. Works ONLY while the hub has no admin
+    yet (naturally single-use — once an admin exists it 409s). Uses the setup
+    code the installer printed, so a fresh install needs no token / .env edit.
+    """
+    auth.enforce_csrf(request)
+    username = (payload.get("username") or "").strip()
+    code = (payload.get("code") or "").strip()
+    if not username:
+        raise HubError(400, "username is required", "bad_request")
+
+    conn = db.connect()
+    try:
+        if db.count_admins(conn) > 0:
+            raise HubError(409, "This hub is already set up. Ask an admin for "
+                           "the PIN, or use the admin token.", "setup_complete")
+        if not auth.verify_setup_code(code):
+            raise HubError(403, "Incorrect setup code", "bad_setup_code")
+
+        token = auth.read_device_token(request)
+        device = db.get_device_by_hash(conn, auth.sha256_hex(token)) if token else None
+        if device is None:
+            token = auth.new_device_token()
+            device_id = auth.register_new_device(conn, token, username)
+            auth.set_device_cookie(response, token)
+        else:
+            device_id = device["id"]
+            auth.set_device_cookie(response, token)  # refresh
+        auth.make_admin(conn, device_id, username)
+        device = db.get_device(conn, device_id)
+        return auth.device_to_me(device)
+    finally:
+        conn.close()
+
+
 @router.post("/session/elevate")
 def elevate(response: Response, request: Request, payload: dict = Body(default={})):
     """Promote the CURRENT device to admin by entering the admin PIN.

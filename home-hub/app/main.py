@@ -117,6 +117,8 @@ def create_app() -> FastAPI:
             "version": app.version,
             "base_url": base_url,
             "setup_required": setup_required,
+            # Whether first-run setup needs the installer's code (vs username-only).
+            "setup_code_required": bool(config.HUB_SETUP_CODE),
         }
 
     _CORS_HEADERS = {

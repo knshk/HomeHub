@@ -67,6 +67,11 @@ HUB_BOOTSTRAP_TOKEN = os.getenv("HUB_BOOTSTRAP_TOKEN", "")
 # encrypted in the secret store); this env value is the fallback when none is
 # stored. Any user can become admin from any device by entering the PIN.
 HUB_ADMIN_PIN = os.getenv("HUB_ADMIN_PIN", "")
+# First-run setup code (short, printed by the installer). While the hub has NO
+# admin yet, the first-run screen accepts this code to create the first admin —
+# so a fresh install needs no token/.env editing. Ignored once an admin exists.
+# If empty, first-run falls back to first-device-wins (username only).
+HUB_SETUP_CODE = os.getenv("HUB_SETUP_CODE", "")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen2.5-7b")
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")

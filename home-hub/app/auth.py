@@ -155,6 +155,23 @@ def verify_admin_pin(pin: str) -> bool:
 
 
 # ----------------------------------------------------------------------------
+# First-run setup code — creates the FIRST admin on a fresh install, so nobody
+# has to read a token out of .env. Only meaningful while zero admins exist
+# (the route enforces that). If no code is configured, setup is username-only
+# (first-device-wins) — acceptable on a trusted LAN during initial setup.
+# ----------------------------------------------------------------------------
+def setup_code_required() -> bool:
+    return bool(config.HUB_SETUP_CODE)
+
+
+def verify_setup_code(code: str) -> bool:
+    want = config.HUB_SETUP_CODE
+    if not want:
+        return True  # no code configured -> first-device-wins during setup
+    return constant_eq((code or "").strip(), want.strip())
+
+
+# ----------------------------------------------------------------------------
 # CSRF enforcement
 # ----------------------------------------------------------------------------
 _STATE_CHANGING = {"POST", "PUT", "DELETE", "PATCH"}

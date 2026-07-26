@@ -138,6 +138,20 @@ cmd_status() {
 
 cmd_https() { need_root https; exec "$HERE/installer/enable-platform.sh"; }
 
+cmd_setup_code() {
+  local env="$HERE/home-hub/.env" code
+  code="$(grep -E '^HUB_SETUP_CODE=' "$env" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+  if [ -n "$code" ]; then
+    echo "First-run setup code: $code"
+    echo "Enter it on the hub's Welcome screen to create the first admin."
+    echo "(Only works until an admin exists; then use the admin PIN.)"
+  else
+    echo "No HUB_SETUP_CODE is set in $env."
+    echo "The hub is likely already set up (use the admin PIN), or add one:"
+    echo "  echo 'HUB_SETUP_CODE=123456' >> $env  &&  sudo $0 restart"
+  fi
+}
+
 cmd_help() {
   cat <<EOF
 HomeHub control script — run the appliance and reach it from every device.
@@ -154,6 +168,7 @@ Commands:
     shutdown        alias for stop-all
   status          Show service + firewall + reachability status.      [no sudo]
   url             Print the addresses to open on other devices.       [no sudo]
+  setup-code      Print the first-run setup code for the first admin.  [no sudo]
   https           Turn on local HTTPS + permanent homehub.local
                   (delegates to installer/enable-platform.sh).           [sudo]
   help            Show this help.                                     [no sudo]
@@ -177,6 +192,7 @@ case "${1:-help}" in
   status)  cmd_status ;;
   url|urls) print_urls ;;
   https)   cmd_https ;;
+  setup-code) cmd_setup_code ;;
   help|-h|--help) cmd_help ;;
   *) echo "unknown command: $1" >&2; echo >&2; cmd_help >&2; exit 1 ;;
 esac

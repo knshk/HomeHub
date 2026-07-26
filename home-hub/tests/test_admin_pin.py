@@ -71,6 +71,24 @@ def test_infinite_attempts_no_lockout(mem_pin):
     assert auth.verify_admin_pin("2468") is True
 
 
+# --- first-run setup code ---------------------------------------------------
+def test_setup_code_not_required_when_unset(monkeypatch):
+    monkeypatch.setattr(auth.config, "HUB_SETUP_CODE", "")
+    assert auth.setup_code_required() is False
+    # No code configured -> any entry (incl. blank) passes: first-device-wins.
+    assert auth.verify_setup_code("") is True
+    assert auth.verify_setup_code("whatever") is True
+
+
+def test_setup_code_enforced_when_set(monkeypatch):
+    monkeypatch.setattr(auth.config, "HUB_SETUP_CODE", "482913")
+    assert auth.setup_code_required() is True
+    assert auth.verify_setup_code("482913") is True
+    assert auth.verify_setup_code(" 482913 ") is True   # trimmed
+    assert auth.verify_setup_code("000000") is False
+    assert auth.verify_setup_code("") is False
+
+
 def test_secret_store_error_is_swallowed(mem_pin, monkeypatch):
     """A secret-store failure must not crash elevation checks (falls back)."""
     def boom(ns, n):

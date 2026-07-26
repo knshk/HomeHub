@@ -98,6 +98,25 @@
         </p>
       </form>
 
+      <!-- First-run setup (shown only when the hub has no admin yet) -->
+      <form id="gate-setup-form" class="gate-form" autocomplete="off" hidden>
+        <p class="gate-hint" style="margin-top:0">
+          <strong>Welcome!</strong> This Home Hub has no admin yet. Set it up now
+          and you'll become the administrator.
+        </p>
+        <label class="field-label" for="gate-setup-username">Your name</label>
+        <input id="gate-setup-username" class="field" type="text" autocapitalize="none"
+               autocomplete="username" placeholder="e.g. alex" maxlength="40">
+        <div id="gate-setup-code-row" hidden>
+          <label class="field-label" for="gate-setup-code">Setup code</label>
+          <input id="gate-setup-code" class="field" type="text" inputmode="numeric"
+                 autocomplete="off" placeholder="the code shown when you installed">
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg btn-block">
+          Set up &amp; become admin
+        </button>
+      </form>
+
       <button id="gate-show-admin" type="button" class="btn-link gate-admin-toggle">
         I'm the admin
       </button>

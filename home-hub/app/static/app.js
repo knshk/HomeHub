@@ -313,6 +313,20 @@ function wireGlobalUI() {
     await gateAction(() => api('/api/session/register', { method: 'POST', body: { username } }));
   });
 
+  // Gate: first-run setup — create the first admin (no token needed)
+  $('#gate-setup-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = $('#gate-setup-username').value.trim();
+    const code = ($('#gate-setup-code')?.value || '').trim();
+    if (!username) return;
+    const err = $('#gate-error'); err.hidden = true;
+    try {
+      const me = await api('/api/session/setup', { method: 'POST', body: { username, code } });
+      onMe(me);
+      toast('You’re the admin. Set an admin PIN in Settings so others can join from any device.', 'success');
+    } catch (ex) { err.textContent = ex.message || 'Setup failed.'; err.hidden = false; }
+  });
+
   // Gate: toggle admin form
   $('#gate-show-admin').addEventListener('click', () => {
     $('#gate-register-form').hidden = true;
@@ -436,6 +450,7 @@ async function probeDiscovery(baseUrl, { credentials } = {}) {
         version: data.version,
         base_url: typeof data.base_url === 'string' ? data.base_url : baseUrl,
         setup_required: !!data.setup_required,
+        setup_code_required: !!data.setup_code_required,
         origin: new URL(url).origin,
       };
     }
@@ -516,9 +531,32 @@ async function probeCurrentOrigin() {
   _originProbed = true;
   if (hub) {
     showConnected(hub.name);
+    showSetupMode(!!hub.setup_required, hub);
   } else {
     // This origin isn't (yet) answering as a hub — keep the finder visible.
     showFinder("We couldn't confirm a Home Hub at this address. Find yours below.");
+  }
+}
+
+/* First-run: when the hub has no admin yet, show the setup form (become admin)
+ * instead of the normal register/admin choices. Ask for the installer's code
+ * only if the hub requires one. */
+function showSetupMode(on, hub) {
+  const setup = $('#gate-setup-form'), reg = $('#gate-register-form'),
+        showAdmin = $('#gate-show-admin'), adminForm = $('#gate-admin-form');
+  if (on) {
+    if (reg) reg.hidden = true;
+    if (showAdmin) showAdmin.hidden = true;
+    if (adminForm) adminForm.hidden = true;
+    if (setup) setup.hidden = false;
+    const codeRow = $('#gate-setup-code-row');
+    if (codeRow) codeRow.hidden = !(hub && hub.setup_code_required);
+  } else if (setup && !setup.hidden) {
+    // Only revert if we had switched into setup mode (avoid clobbering the
+    // normal gate on a plain re-probe).
+    setup.hidden = true;
+    if (reg) reg.hidden = false;
+    if (showAdmin) showAdmin.hidden = false;
   }
 }
 
