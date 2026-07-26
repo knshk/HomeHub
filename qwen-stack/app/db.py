@@ -363,11 +363,22 @@ def get_model_by_alias_or_tag(name: str) -> Optional[Dict[str, Any]]:
 
 
 def get_model_tuning(alias: str) -> Dict[str, Any]:
-    """Stored tuning for a model, or {} when unset/unparseable."""
-    row = get_model(alias)
-    if not row:
+    """Stored tuning for a model, or {} when unset/unparseable.
+
+    Queries the column directly: get_model() selects an explicit column list
+    (_MODEL_COLS) that deliberately does not carry tuning_json, so going
+    through it would always read None and tuning would silently never apply.
+    """
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT tuning_json FROM managed_models WHERE alias = ?", (alias,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
         return {}
-    raw = row.get("tuning_json")
+    raw = row["tuning_json"]
     if not raw:
         return {}
     try:
@@ -377,14 +388,18 @@ def get_model_tuning(alias: str) -> Dict[str, Any]:
         return {}
 
 
-def set_model_tuning(alias: str, tuning: Dict[str, Any]) -> None:
-    """Persist tuning for a model. An empty dict clears it."""
-    with connect() as conn:
-        conn.execute(
+def set_model_tuning(alias: str, tuning: Dict[str, Any]) -> bool:
+    """Persist tuning for a model. An empty dict clears it. True if a row changed."""
+    conn = get_connection()
+    try:
+        cur = conn.execute(
             "UPDATE managed_models SET tuning_json = ?, updated_at = ? WHERE alias = ?",
             (json.dumps(tuning) if tuning else None, utcnow_iso(), alias),
         )
         conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def upsert_model(alias: str, ollama_tag: str, display_name: str,

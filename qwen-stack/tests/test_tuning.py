@@ -129,3 +129,51 @@ def test_empty_tuning_is_noop():
     before = dict(payload)
     tuning.apply(payload, {})
     assert payload == before
+
+
+# --- storage round-trip (db helpers) ----------------------------------------
+# These exercise the real sqlite writer. The pure-function tests above passed
+# while set_model_tuning() still raised NameError at runtime, so the round-trip
+# needs its own coverage.
+import types
+
+from app import db
+
+
+@pytest.fixture()
+def temp_db(tmp_path, monkeypatch):
+    ns = types.SimpleNamespace(db_path=str(tmp_path / "gateway.db"))
+    monkeypatch.setattr(db, "settings", ns)
+    db.init_db()
+    db.upsert_model("m1", "m1:tag", "M One", role="chat")
+    return db
+
+
+def test_tuning_defaults_to_empty(temp_db):
+    assert db.get_model_tuning("m1") == {}
+
+
+def test_tuning_round_trip(temp_db):
+    assert db.set_model_tuning("m1", {"temperature": 0.4, "history_turns": 6}) is True
+    assert db.get_model_tuning("m1") == {"temperature": 0.4, "history_turns": 6}
+
+
+def test_tuning_cleared_by_empty_dict(temp_db):
+    db.set_model_tuning("m1", {"temperature": 0.4})
+    db.set_model_tuning("m1", {})
+    assert db.get_model_tuning("m1") == {}
+
+
+def test_tuning_unknown_model_changes_nothing(temp_db):
+    assert db.set_model_tuning("nope", {"temperature": 0.4}) is False
+    assert db.get_model_tuning("nope") == {}
+
+
+def test_tuning_survives_corrupt_json(temp_db):
+    conn = db.get_connection()
+    try:
+        conn.execute("UPDATE managed_models SET tuning_json = ? WHERE alias = ?", ("{oops", "m1"))
+        conn.commit()
+    finally:
+        conn.close()
+    assert db.get_model_tuning("m1") == {}      # degrades, never raises
