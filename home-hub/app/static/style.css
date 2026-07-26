@@ -1606,3 +1606,31 @@ body.modal-open { overflow: hidden; }
    buttons and never shrink them away. */
 .cal-views { overflow: visible; flex: 0 0 auto; }
 .cal-view-btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* =========================================================================
+   Launcher, wide screens: two panes.
+       left  — every feature, grouped
+       right — live previews (noticeboard, tasks), sticky while you scroll
+   Replaces the earlier column-count flow, which let groups break across two
+   columns at uneven heights and read as scattered.
+   ========================================================================= */
+@media (min-width: 1080px) {
+  .lc-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: var(--sp-5);
+    align-items: start;
+  }
+  /* the left pane is a single flow again — tiles still fill it in a grid */
+  #lc-groups { column-count: auto; }
+  #lc-groups > .lc-grouplbl:first-child { margin-top: 0; }
+
+  /* right rail: cards stack, and follow you down the page */
+  #lc-previews { display: block; position: sticky; top: 112px; }
+  .lc-prev-row { grid-template-columns: 1fr; gap: var(--sp-3); }
+}
+
+/* Below the split, previews aren't rendered — keep the flow simple. */
+@media (max-width: 1079px) {
+  .lc-body { display: block; }
+}

@@ -241,9 +241,14 @@
           <p class="lc-status" id="lc-status"></p>
         </div>
         <div id="lc-install-slot"></div>
-        <!-- Desktop only: a peek at the noticeboard and what's due. -->
-        <div id="lc-previews"></div>
-        <div id="lc-groups"></div>
+        <!-- Wide screens split into two panes: features on the left, live
+             previews in a sticky right rail. Phones get a single flow (the
+             previews are not rendered there at all). -->
+        <div class="lc-body">
+          <div id="lc-groups"></div>
+          <!-- Desktop only: a peek at the noticeboard and what's due. -->
+          <div id="lc-previews"></div>
+        </div>
       </section>
 
       <section class="panel" id="panel-chat" data-tab="chat" hidden>
