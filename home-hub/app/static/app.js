@@ -412,6 +412,12 @@ function wireGlobalUI() {
     if (btn && !btn.disabled) selectTab(btn.dataset.tab);
   });
 
+  // Tab rail pager (‹ ›) — horizontal scrolling alone isn't reliable off macOS.
+  $('#tabs-prev')?.addEventListener('click', () => scrollTabs(-1));
+  $('#tabs-next')?.addEventListener('click', () => scrollTabs(1));
+  $('#tabs')?.addEventListener('scroll', updateTabsNav, { passive: true });
+  window.addEventListener('resize', updateTabsNav);
+
   // Launcher: brand mark and the back arrow both return home; tiles open a feature.
   $('#brand-home')?.addEventListener('click', goHome);
   $('#nav-back')?.addEventListener('click', goHome);
@@ -827,6 +833,37 @@ function renderTabs() {
     const tab = btn.dataset.tab;
     btn.hidden = !tabAllowed(tab);
   });
+  updateTabsNav();
+}
+
+/* ---- tab rail pager ------------------------------------------------------
+ * Eleven sections don't fit, and horizontal scrolling is awkward without a
+ * trackpad (on Windows/Linux there's often no visible scrollbar and no
+ * shift-wheel habit), so the last tabs were effectively unreachable. Same
+ * ‹ › pattern as the Images ribbon. */
+function updateTabsNav() {
+  const t = $('#tabs');
+  const wrap = t && t.closest('.tabs-wrap');
+  if (!t || !wrap) return;
+  const scrollable = t.scrollWidth > t.clientWidth + 4;
+  wrap.classList.toggle('no-scroll', !scrollable);
+  const prev = $('#tabs-prev'), next = $('#tabs-next');
+  if (prev) prev.disabled = t.scrollLeft <= 2;
+  if (next) next.disabled = t.scrollLeft >= t.scrollWidth - t.clientWidth - 2;
+}
+
+function scrollTabs(dir) {
+  const t = $('#tabs');
+  if (t) t.scrollBy({ left: dir * Math.max(160, Math.round(t.clientWidth * 0.7)), behavior: 'smooth' });
+}
+
+/** Keep the active tab visible when it's selected from elsewhere (launcher). */
+function revealActiveTab() {
+  const btn = $(`#tabs .tab[data-tab="${State.activeTab}"]`);
+  if (btn && !btn.hidden && btn.scrollIntoView) {
+    btn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }
+  updateTabsNav();
 }
 
 /* ===========================================================================
@@ -1151,6 +1188,7 @@ function selectTab(tab) {
   $$('.panel').forEach((p) => (p.hidden = p.dataset.tab !== tab));
   closeSheets();                 // never leave a sheet open across a tab change
   updateNavBack();               // show "back" only when away from the launcher
+  revealActiveTab();             // scroll the rail so the active tab is visible
 
   switch (tab) {
     case 'launcher':   renderLauncher(); break;
