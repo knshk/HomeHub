@@ -8,7 +8,9 @@
 #   ./homehub.sh status         show service + reachability status (no sudo)
 #   ./homehub.sh url            just print the addresses to open
 #   sudo ./homehub.sh restart   restart services (after a code change)
-#   sudo ./homehub.sh stop      stop the family-facing services
+#   sudo ./homehub.sh stop      stop the family-facing services (leaves ollama)
+#   sudo ./homehub.sh stop-all  stop EVERYTHING, incl. ollama + the mDNS advert
+#                               (alias: shutdown)
 #   sudo ./homehub.sh https     turn on local HTTPS + persistent homehub.local
 #                               (delegates to installer/enable-platform.sh)
 #
@@ -101,6 +103,20 @@ cmd_start() {
 cmd_restart() { need_root restart; systemctl restart "${SERVICES[@]}"; echo "restarted: ${SERVICES[*]}"; }
 cmd_stop()    { need_root stop; systemctl stop "${FAMILY_FACING[@]}"; echo "stopped: ${FAMILY_FACING[*]} (ollama left running)"; }
 
+cmd_stop_all() {
+  need_root stop-all
+  # Stop dependents before ollama (reverse of start order). `|| true` so one
+  # already-stopped/odd unit can't abort a full takedown under `set -e`.
+  local order=(home-hub qwen-gateway voice-svc ollama)
+  systemctl stop "${order[@]}" 2>/dev/null || true
+  # Stop any mDNS advert too, so homehub.local stops pointing at a dead hub.
+  systemctl stop homehub-mdns-transient.service 2>/dev/null || true
+  systemctl stop homehub-mdns.service 2>/dev/null || true
+  echo "stopped EVERYTHING: ${order[*]} (+ mDNS advert)"
+  echo "note: the LAN firewall rule is left in place (harmless with nothing"
+  echo "      listening); 'start' or a reboot brings services + mDNS back up."
+}
+
 cmd_status() {
   echo "Services:"
   for s in "${SERVICES[@]}"; do printf "  %-14s %s\n" "$s" "$(systemctl is-active "$s" 2>/dev/null || echo unknown)"; done
@@ -126,8 +142,9 @@ case "${1:-start}" in
   start)   cmd_start ;;
   restart) cmd_restart ;;
   stop)    cmd_stop ;;
+  stop-all|shutdown) cmd_stop_all ;;
   status)  cmd_status ;;
   url|urls) print_urls ;;
   https)   cmd_https ;;
-  *) echo "usage: $0 {start|restart|stop|status|url|https}"; exit 1 ;;
+  *) echo "usage: $0 {start|restart|stop|stop-all|status|url|https}"; exit 1 ;;
 esac
