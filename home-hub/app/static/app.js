@@ -2682,7 +2682,12 @@ function showKeyReveal(res, name) {
 }
 
 function fmtDate(s) {
-  const d = new Date(s);
+  // DB timestamps are Unix SECONDS; JS Date wants milliseconds. Numeric values
+  // below 1e12 (any real date, as seconds) are scaled up; larger numbers are
+  // already ms, and non-numeric strings (ISO, etc.) are parsed as-is.
+  let v = Number(s);
+  if (!isNaN(v)) { if (v < 1e12) v *= 1000; } else { v = s; }
+  const d = new Date(v);
   if (isNaN(d.getTime())) return String(s);
   return d.toLocaleString();
 }
