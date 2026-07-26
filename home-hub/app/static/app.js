@@ -2010,6 +2010,35 @@ async function onRecordingStop() {
 }
 
 /* ---- read-aloud (TTS) ---- */
+/* ---- audio unlock (iOS/Safari) -------------------------------------------
+ * Mobile browsers only allow playback that STARTS inside a user gesture.
+ * Speaking a reply needs a TTS round-trip first, so by the time play() runs the
+ * gesture window has closed and the browser raises NotAllowedError ("The
+ * request is not allowed by the user agent or the platform..."). Priming the
+ * element with a moment of silence during a real interaction marks it as
+ * user-activated for the rest of the session, after which programmatic play()
+ * is permitted. */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+let _audioPrimed = false;
+
+function primeAudio() {
+  if (_audioPrimed) return;
+  const a = $('#voice-audio');
+  if (!a) return;
+  _audioPrimed = true;               // only ever attempt this once
+  try {
+    a.muted = true;
+    a.src = SILENT_WAV;
+    const p = a.play();
+    const done = () => { try { a.pause(); a.currentTime = 0; } catch (e) {} a.muted = false; };
+    if (p && typeof p.then === 'function') p.then(done, () => { a.muted = false; });
+    else done();
+  } catch (e) { a.muted = false; }
+}
+// Any first interaction anywhere is enough to bless the element.
+document.addEventListener('pointerdown', primeAudio, { once: true, capture: true });
+document.addEventListener('keydown', primeAudio, { once: true, capture: true });
+
 function makeReadAloudBtn(getText) {
   return el('button', {
     type: 'button',
@@ -2019,6 +2048,7 @@ function makeReadAloudBtn(getText) {
     onclick: (e) => {
       e.stopPropagation();      // don't trigger card/message click handlers
       e.preventDefault();
+      primeAudio();             // synchronous, inside the gesture — must precede any await
       const text = (getText() || '').trim();
       if (text) speakText(text);
     },
@@ -2043,9 +2073,17 @@ async function speakText(text) {
     const url = URL.createObjectURL(blob);
     audio.dataset.objUrl = url;
     audio.src = url;
+    audio.muted = false;
     await audio.play();
   } catch (e) {
-    toast(e.message || 'Could not play audio.', 'error');
+    // A blocked autoplay is not a failure the user can act on from the raw
+    // DOMException text, so say what actually helps.
+    if (e && (e.name === 'NotAllowedError' || /not allowed/i.test(e.message || ''))) {
+      _audioPrimed = false;          // let the next tap re-prime the element
+      toast('Tap the speaker again to play — your browser needs a tap to start audio.', 'error');
+    } else {
+      toast(e.message || 'Could not play audio.', 'error');
+    }
   } finally {
     setVoiceStatus('');
   }
