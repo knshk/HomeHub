@@ -287,6 +287,12 @@ async def _cloud_completion(
     -> monthly budget (429). Usage is logged exactly like local traffic, with
     the client alias as the model name.
     """
+    # Cloud models are managed rows too, so their stored tuning must apply here
+    # as well -- otherwise the Tune dialog would appear to work and change
+    # nothing. Applied before provider translation so it rides along.
+    stored = db.get_model_tuning(model_row["alias"])
+    if stored:
+        payload = tuning.apply(payload, stored)
     provider_name = model_row["provider"]
     provider_row = db.get_provider(provider_name)
     month_tokens = providers.month_usage(provider_name)

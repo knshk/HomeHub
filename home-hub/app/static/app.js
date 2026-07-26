@@ -3748,8 +3748,10 @@ function modelCard(m) {
     if (m.state === 'suspended') actions.append(act('Resume', 'resume', 'btn-primary'), act('Shutdown', 'shutdown'));
   }
   actions.append(el('button', { class: 'btn btn-sm btn-ghost', dataset: { modelMetrics: '1', key: m.key, source: m.source } }, 'Metrics'));
-  // Tuning applies to registered models (they have a stored row to attach it to).
-  if (m.source !== 'catalog' && !m.pulling) {
+  // Tuning needs a row in the gateway's managed_models to attach to. Voice
+  // service entries (stt/tts) and catalog items have none, so offering it there
+  // produced a 404 rather than a dialog.
+  if (m.source === 'gateway' && !m.pulling) {
     actions.append(el('button', { class: 'btn btn-sm btn-ghost', dataset: { modelTune: '1', key: m.key } }, 'Tune'));
   }
   if (m.removable) actions.append(el('button', { class: 'btn btn-sm btn-ghost danger', dataset: { modelRemove: '1', key: m.key } }, 'Remove'));
