@@ -23,7 +23,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from . import db, model_manager, providers
+from . import db, model_manager, providers, tuning
 from .auth import openai_error, require_api_key
 from .config import ALIAS_MAP, resolve_model, settings
 
@@ -108,6 +108,13 @@ async def _forward_completion(
         return await _cloud_completion(payload, key_row, model_row, client_model)
 
     payload["model"] = resolve_model(client_model)
+    # Per-model tuning: fills only what the caller left unset, plus the persona
+    # and history cap (see app/tuning.py). Applied here so every local model
+    # gets it regardless of which completion path was used.
+    if model_row is not None:
+        stored = db.get_model_tuning(model_row["alias"])
+        if stored:
+            payload = tuning.apply(payload, stored)
     is_stream = bool(payload.get("stream", False))
     upstream_url = f"{settings.ollama_base_url}{upstream_path}"
     key_id = int(key_row["id"])

@@ -1662,3 +1662,10 @@ body.modal-open { overflow: hidden; }
   /* The launcher is the navigation on phones; the rail stays hidden there. */
   .tabs-wrap { padding: 0; }
 }
+
+/* ---- per-model tuning dialog ------------------------------------------- */
+.tune-dialog { max-width: 520px; }
+.tune-fields { display: grid; gap: var(--sp-3); margin: var(--sp-4) 0; max-height: 56dvh; overflow: auto; }
+.tune-row .field-label { margin-bottom: var(--sp-1); }
+.tune-help { margin: var(--sp-1) 0 0; font-size: var(--fs-xs); color: var(--muted); line-height: 1.35; }
+.tune-text { min-height: 72px; resize: vertical; padding: 10px 12px; }

@@ -7,6 +7,7 @@ module. All SQL is parameterised — no string interpolation of user input.
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from datetime import datetime, timezone
@@ -124,6 +125,9 @@ def init_db() -> None:
             conn.execute("ALTER TABLE managed_models ADD COLUMN provider TEXT NOT NULL DEFAULT 'local'")
         if "upstream_model" not in cols:
             conn.execute("ALTER TABLE managed_models ADD COLUMN upstream_model TEXT DEFAULT NULL")
+        if "tuning_json" not in cols:
+            # Per-model generation tuning (see app/tuning.py). NULL = defaults.
+            conn.execute("ALTER TABLE managed_models ADD COLUMN tuning_json TEXT DEFAULT NULL")
         key_cols = {r["name"] for r in conn.execute("PRAGMA table_info(api_keys)")}
         if "cloud_allowed" not in key_cols:
             conn.execute("ALTER TABLE api_keys ADD COLUMN cloud_allowed INTEGER NOT NULL DEFAULT 0")
@@ -355,6 +359,32 @@ def get_model_by_alias_or_tag(name: str) -> Optional[Dict[str, Any]]:
         return _row_to_dict(row)
     finally:
         conn.close()
+
+
+
+def get_model_tuning(alias: str) -> Dict[str, Any]:
+    """Stored tuning for a model, or {} when unset/unparseable."""
+    row = get_model(alias)
+    if not row:
+        return {}
+    raw = row.get("tuning_json")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def set_model_tuning(alias: str, tuning: Dict[str, Any]) -> None:
+    """Persist tuning for a model. An empty dict clears it."""
+    with connect() as conn:
+        conn.execute(
+            "UPDATE managed_models SET tuning_json = ?, updated_at = ? WHERE alias = ?",
+            (json.dumps(tuning) if tuning else None, utcnow_iso(), alias),
+        )
+        conn.commit()
 
 
 def upsert_model(alias: str, ollama_tag: str, display_name: str,

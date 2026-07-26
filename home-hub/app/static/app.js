@@ -3683,6 +3683,10 @@ function modelCard(m) {
     if (m.state === 'suspended') actions.append(act('Resume', 'resume', 'btn-primary'), act('Shutdown', 'shutdown'));
   }
   actions.append(el('button', { class: 'btn btn-sm btn-ghost', dataset: { modelMetrics: '1', key: m.key, source: m.source } }, 'Metrics'));
+  // Tuning applies to registered models (they have a stored row to attach it to).
+  if (m.source !== 'catalog' && !m.pulling) {
+    actions.append(el('button', { class: 'btn btn-sm btn-ghost', dataset: { modelTune: '1', key: m.key } }, 'Tune'));
+  }
   if (m.removable) actions.append(el('button', { class: 'btn btn-sm btn-ghost danger', dataset: { modelRemove: '1', key: m.key } }, 'Remove'));
 
   // Disk always; RAM (in memory), requests, tokens only when non-zero.
@@ -3728,7 +3732,76 @@ async function onModelClick(e) {
   if (btn.dataset.modelPull)    return pullModel(btn.dataset.tag, btn.dataset.role, btn);
   if (btn.dataset.modelAction)  return doModelAction(key, btn.dataset.modelAction, source, btn);
   if (btn.dataset.modelMetrics) return openMetricsDialog(key, source);
+  if (btn.dataset.modelTune)    return openTuningDialog(key);
   if (btn.dataset.modelRemove)  return removeModel(key);
+}
+
+/* ---- per-model tuning ----------------------------------------------------
+ * Controls are generated from the schema the gateway returns, so the two can
+ * never drift: adding a knob server-side makes it appear here automatically. */
+async function openTuningDialog(alias) {
+  let data;
+  try {
+    data = await api(`/api/admin/models/${encodeURIComponent(alias)}/tuning`);
+  } catch (e) { return toast(e.message, 'error'); }
+
+  const schema = data.schema || {};
+  const current = data.tuning || {};
+  const inputs = {};
+  const fields = el('div', { class: 'tune-fields' });
+
+  for (const [name, spec] of Object.entries(schema)) {
+    const val = current[name];
+    let input;
+    if (spec.kind === 'text') {
+      input = el('textarea', { class: 'field tune-text', rows: 3, maxlength: spec.max_len || 4000,
+        placeholder: 'Model default' });
+      input.value = val == null ? '' : String(val);
+    } else {
+      input = el('input', {
+        class: 'field', type: 'number', placeholder: 'Model default',
+        min: spec.min, max: spec.max, step: spec.kind === 'int' ? 1 : 0.05,
+      });
+      input.value = val == null ? '' : String(val);
+    }
+    inputs[name] = input;
+    fields.append(el('div', { class: 'tune-row' },
+      el('label', { class: 'field-label' }, spec.label || name),
+      input,
+      spec.help ? el('p', { class: 'tune-help' }, spec.help) : null));
+  }
+
+  const msg = el('p', { class: 'form-error', hidden: true });
+  const collect = () => {
+    const out = {};
+    for (const [name, node] of Object.entries(inputs)) {
+      const v = node.value.trim();
+      if (v !== '') out[name] = v;          // blank = clear (gateway drops it)
+    }
+    return out;
+  };
+  const save = async (payload, okText) => {
+    msg.hidden = true;
+    try {
+      await api(`/api/admin/models/${encodeURIComponent(alias)}/tuning`,
+        { method: 'PUT', body: { tuning: payload } });
+      toast(okText, 'success');
+      closeModal();
+    } catch (e) { msg.textContent = e.message; msg.hidden = false; }
+  };
+
+  openModal(el('div', { class: 'tune-dialog' },
+    el('h3', {}, `Tune ${alias}`),
+    el('p', { class: 'muted' },
+      'These shape how this model answers. Blank means the model default, and '
+      + 'anything a request sets explicitly still wins.'),
+    fields,
+    msg,
+    el('div', { class: 'modal-actions' },
+      el('button', { class: 'btn btn-ghost', onclick: () => save({}, 'Tuning reset') }, 'Reset'),
+      el('button', { class: 'btn btn-primary', onclick: () => save(collect(), 'Tuning saved') }, 'Save'),
+    ),
+  ));
 }
 
 async function startAiFromModel(btn) {

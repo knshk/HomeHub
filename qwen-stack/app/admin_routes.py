@@ -18,11 +18,11 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import auth, db, model_manager, providers
+from . import auth, db, model_manager, providers, tuning
 from .config import settings
 
 # Client-facing aliases become URL path segments, so keep them path-safe.
@@ -320,6 +320,35 @@ async def add_model(body: AddModelRequest,
         status_code=status.HTTP_201_CREATED,
         content={**row, "pulling": pulling},
     )
+
+
+@router.get("/models/{alias}/tuning")
+async def get_model_tuning(alias: str,
+                           _: bool = Depends(require_admin)) -> JSONResponse:
+    """Current tuning for a model plus the schema the UI renders controls from."""
+    if db.get_model(alias) is None:
+        raise _admin_error(status.HTTP_404_NOT_FOUND, f"Unknown model '{alias}'.")
+    return JSONResponse(content={
+        "alias": alias,
+        "tuning": db.get_model_tuning(alias),
+        "schema": tuning.SCHEMA,
+    })
+
+
+@router.put("/models/{alias}/tuning")
+async def put_model_tuning(alias: str, payload: Dict[str, Any] = Body(default={}),
+                           _: bool = Depends(require_admin)) -> JSONResponse:
+    """Replace a model's tuning. Values are clamped to the schema; blank fields
+    clear back to the default. Send {} to reset everything."""
+    if db.get_model(alias) is None:
+        raise _admin_error(status.HTTP_404_NOT_FOUND, f"Unknown model '{alias}'.")
+    raw = payload.get("tuning", payload)
+    try:
+        cleaned = tuning.sanitize(raw)
+    except ValueError as exc:
+        raise _admin_error(status.HTTP_400_BAD_REQUEST, str(exc))
+    db.set_model_tuning(alias, cleaned)
+    return JSONResponse(content={"alias": alias, "tuning": cleaned})
 
 
 @router.post("/models/{alias}/{action}")

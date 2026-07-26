@@ -154,6 +154,20 @@ async def model_import_status(name: str, device=Depends(_admin)):
         "GET", "/admin/models/import/status", params={"name": name})
 
 
+@router.get("/models/{alias}/tuning")
+async def get_model_tuning(alias: str, device=Depends(_admin)):
+    """Current tuning + the schema the dialog renders from."""
+    return await integration.gateway_admin_json("GET", f"/admin/models/{alias}/tuning")
+
+
+@router.put("/models/{alias}/tuning")
+async def set_model_tuning(alias: str, payload: dict = Body(default={}),
+                           device=Depends(_admin)):
+    """Save tuning for a model (values are clamped gateway-side)."""
+    return await integration.gateway_admin_json(
+        "PUT", f"/admin/models/{alias}/tuning", json=payload)
+
+
 @router.get("/models/{alias}/metrics")
 async def model_metrics(alias: str, hours: int = 24, bucket: str = "hour",
                         device=Depends(_admin)):
