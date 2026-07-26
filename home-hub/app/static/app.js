@@ -2018,26 +2018,52 @@ async function onRecordingStop() {
  * element with a moment of silence during a real interaction marks it as
  * user-activated for the rest of the session, after which programmatic play()
  * is permitted. */
-const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
-let _audioPrimed = false;
+let _silentUrl = null;
 
-function primeAudio() {
-  if (_audioPrimed) return;
+/** A short WAV of REAL silence. A zero-sample file will not play at all, so the
+ *  element never becomes user-activated — which is why short replies worked
+ *  (the tap's ~5s activation window was still open) and long ones did not. */
+function silentWavUrl(ms = 400) {
+  if (_silentUrl) return _silentUrl;
+  const rate = 8000, frames = Math.round(rate * ms / 1000), bytes = 44 + frames * 2;
+  const dv = new DataView(new ArrayBuffer(bytes));
+  const put = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
+  put(0, 'RIFF');  dv.setUint32(4, bytes - 8, true);      put(8, 'WAVE');
+  put(12, 'fmt '); dv.setUint32(16, 16, true);            dv.setUint16(20, 1, true);
+  dv.setUint16(22, 1, true);        dv.setUint32(24, rate, true);
+  dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  put(36, 'data'); dv.setUint32(40, frames * 2, true);    // samples stay zero = silence
+  _silentUrl = URL.createObjectURL(new Blob([dv.buffer], { type: 'audio/wav' }));
+  return _silentUrl;
+}
+
+/** Called synchronously INSIDE the tap: start looping real silence so the
+ *  element is genuinely playing. Swapping src on an already-playing element is
+ *  permitted, so synthesis may then take as long as it likes — which is what
+ *  long replies need. */
+function holdAudioOpen() {
   const a = $('#voice-audio');
   if (!a) return;
-  _audioPrimed = true;               // only ever attempt this once
   try {
-    a.muted = true;
-    a.src = SILENT_WAV;
+    a.loop = true;
+    a.muted = false;
+    a.src = silentWavUrl();
     const p = a.play();
-    const done = () => { try { a.pause(); a.currentTime = 0; } catch (e) {} a.muted = false; };
-    if (p && typeof p.then === 'function') p.then(done, () => { a.muted = false; });
-    else done();
-  } catch (e) { a.muted = false; }
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (e) { /* falls back to the post-fetch play attempt */ }
 }
-// Any first interaction anywhere is enough to bless the element.
-document.addEventListener('pointerdown', primeAudio, { once: true, capture: true });
-document.addEventListener('keydown', primeAudio, { once: true, capture: true });
+
+/** Stop the placeholder silence (on failure, or before real audio plays). */
+function releaseAudioHold() {
+  const a = $('#voice-audio');
+  if (!a) return;
+  a.loop = false;
+  if (_silentUrl && a.src === _silentUrl) { try { a.pause(); } catch (e) {} }
+}
+
+// Bless the element early too, so speak-replies (which has no tap of its own)
+// can play after a voice message.
+document.addEventListener('pointerdown', holdAudioOpen, { once: true, capture: true });
 
 function makeReadAloudBtn(getText) {
   return el('button', {
@@ -2048,9 +2074,9 @@ function makeReadAloudBtn(getText) {
     onclick: (e) => {
       e.stopPropagation();      // don't trigger card/message click handlers
       e.preventDefault();
-      primeAudio();             // synchronous, inside the gesture — must precede any await
+      holdAudioOpen();          // synchronous, inside the gesture — must precede any await
       const text = (getText() || '').trim();
-      if (text) speakText(text);
+      if (text) speakText(text); else releaseAudioHold();
     },
   }, '\u{1F50A}');
 }
@@ -2072,14 +2098,15 @@ async function speakText(text) {
     if (audio.dataset.objUrl) { try { URL.revokeObjectURL(audio.dataset.objUrl); } catch {} }
     const url = URL.createObjectURL(blob);
     audio.dataset.objUrl = url;
+    audio.loop = false;          // stop the placeholder silence, keep the activation
     audio.src = url;
     audio.muted = false;
     await audio.play();
   } catch (e) {
     // A blocked autoplay is not a failure the user can act on from the raw
     // DOMException text, so say what actually helps.
+    releaseAudioHold();
     if (e && (e.name === 'NotAllowedError' || /not allowed/i.test(e.message || ''))) {
-      _audioPrimed = false;          // let the next tap re-prime the element
       toast('Tap the speaker again to play — your browser needs a tap to start audio.', 'error');
     } else {
       toast(e.message || 'Could not play audio.', 'error');
