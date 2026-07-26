@@ -1540,3 +1540,31 @@ body.modal-open { overflow: hidden; }
   .speak-toggle input:checked + .track .knob-ic { transform: none; color: var(--accent); }
   .speak-toggle input:focus-visible + .track { box-shadow: var(--ring); }
 }
+
+/* =========================================================================
+   Calendar nav, two-row layout:
+       [<] [>] [Today]            [Week|Month|Year]
+       26 Jul – 1 Aug 2026
+   Previously all of it shared one no-wrap row, so the title was squeezed until
+   it wrapped a word per line and the "Year" button overflowed off-screen.
+   ========================================================================= */
+.cal-nav {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: var(--sp-2); margin-bottom: var(--sp-3);
+}
+.cal-nav-bar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.cal-nav-steps { display: flex; align-items: center; gap: var(--sp-2); flex: 0 0 auto; }
+.cal-nav .cal-views { margin-left: auto; width: auto; flex: 0 0 auto; }
+.cal-nav .cal-view-btn { flex: 0 0 auto; }
+.cal-nav-title {
+  flex: none; text-align: left; white-space: nowrap;
+  font-size: var(--fs-lg); font-family: var(--font-head); font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  /* Keep all three view buttons on the row with the arrows. */
+  .cal-nav .cal-views { width: auto; }
+  .cal-nav .cal-view-btn { padding: 6px 10px; font-size: var(--fs-xs); }
+  .cal-nav-steps .btn { padding: 0 10px; }
+  .cal-nav-title { font-size: var(--fs-md); }
+}

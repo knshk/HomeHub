@@ -2505,18 +2505,25 @@ function calEventsByDate() {
   return byDate;
 }
 
-/** Shared nav row: step, title, Today, and the view switcher. */
+/** Shared nav: controls on one row, the date range on its own line beneath, so
+ *  the title never gets squeezed between them (it used to wrap a word per line
+ *  on a phone, and pushed the "Year" button off the edge). */
 function calNavBar(title, prevTitle, nextTitle) {
   return el('div', { class: 'cal-nav' },
-    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: prevTitle, dataset: { calNav: '-1' } }, '←'),
+    el('div', { class: 'cal-nav-bar' },
+      el('div', { class: 'cal-nav-steps' },
+        el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: prevTitle, 'aria-label': prevTitle, dataset: { calNav: '-1' } }, '←'),
+        el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: nextTitle, 'aria-label': nextTitle, dataset: { calNav: '1' } }, '→'),
+        el('button', { type: 'button', class: 'btn btn-ghost btn-sm', dataset: { calToday: '1' } }, 'Today'),
+      ),
+      el('div', { class: 'cal-views', role: 'group', 'aria-label': 'Calendar view' },
+        ...[['week', 'Week'], ['month', 'Month'], ['year', 'Year']].map(
+          ([v, label]) => el('button', {
+            type: 'button', class: 'cal-view-btn' + (CAL_VIEW === v ? ' on' : ''),
+            dataset: { calView: v }, 'aria-pressed': String(CAL_VIEW === v),
+          }, label))),
+    ),
     el('strong', { class: 'cal-nav-title' }, title),
-    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', title: nextTitle, dataset: { calNav: '1' } }, '→'),
-    el('button', { type: 'button', class: 'btn btn-ghost btn-sm', dataset: { calToday: '1' } }, 'Today'),
-    el('div', { class: 'cal-views' }, ...[['week', 'Week'], ['month', 'Month'], ['year', 'Year']].map(
-      ([v, label]) => el('button', {
-        type: 'button', class: 'cal-view-btn' + (CAL_VIEW === v ? ' on' : ''),
-        dataset: { calView: v }, 'aria-pressed': String(CAL_VIEW === v),
-      }, label))),
   );
 }
 
